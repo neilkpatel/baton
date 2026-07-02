@@ -14,6 +14,8 @@ HOME = os.path.expanduser("~")
 SESSIONS_DIR = os.path.join(HOME, ".claude", "sessions")
 PROJECTS_DIR = os.path.join(HOME, ".claude", "projects")
 CODEX_INDEX = os.path.join(HOME, ".codex", "session_index.jsonl")
+CODEX_SESSIONS = os.path.join(HOME, ".codex", "sessions")
+CODEX_ARCHIVED = os.path.join(HOME, ".codex", "archived_sessions")
 AUTOMATIONS_GLOB = os.path.join(HOME, ".codex", "automations", "*", "automation.toml")
 PROJECTS_ROOT = os.path.join(HOME, "Desktop", "Projects")
 
@@ -241,8 +243,70 @@ def collect_claude():
 
 
 # ----------------------------------------------------------------------------
-# Codex threads — recency only (no working/waiting signal exposed)
+# Codex threads — waiting detected from the rollout transcript's task_complete
 # ----------------------------------------------------------------------------
+_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+_codex_roll_cache = {"ts": 0.0, "map": {}}
+CODEX_ROLL_TTL = 30.0
+
+
+def _codex_rollouts():
+    """thread-id -> newest rollout .jsonl path. Cached ~30s (globbing is the cost)."""
+    if _codex_roll_cache["map"] and time.time() - _codex_roll_cache["ts"] < CODEX_ROLL_TTL:
+        return _codex_roll_cache["map"]
+    out = {}
+    for pat in (os.path.join(CODEX_SESSIONS, "**", "rollout-*.jsonl"),
+                os.path.join(CODEX_ARCHIVED, "rollout-*.jsonl")):
+        for p in glob.glob(pat, recursive=True):
+            m = _UUID_RE.search(os.path.basename(p))
+            if not m:
+                continue
+            tid = m.group(0)
+            if tid not in out or os.path.getmtime(p) > os.path.getmtime(out[tid]):
+                out[tid] = p
+    _codex_roll_cache.update(ts=time.time(), map=out)
+    return out
+
+
+def _codex_tail_state(path):
+    """Read the rollout tail → (completed, answer). completed=True when the last
+    turn-boundary event is `task_complete` (agent finished → the baton's with you)."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - 131072))
+            chunk = f.read().decode("utf-8", "ignore")
+    except Exception:
+        return (False, "")
+    completed, answer = None, ""
+    for line in chunk.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            e = json.loads(line)
+        except Exception:
+            continue
+        typ = e.get("type")
+        payload = e.get("payload") if isinstance(e.get("payload"), dict) else e
+        sub = payload.get("type")
+        if typ == "event_msg":
+            if sub == "task_complete":
+                completed = True
+            elif sub in ("task_started", "turn_aborted", "error", "stream_error"):
+                completed = False
+            elif sub == "agent_message":
+                a = _clean(payload.get("message") or payload.get("text") or "")
+                if a:
+                    answer = a
+        elif typ == "response_item" and sub == "message" and payload.get("role") == "assistant":
+            a = _text_from_content(payload.get("content"))
+            if a:
+                answer = a
+    return (bool(completed), answer)
+
+
 def collect_codex_threads(within_days=3):
     if not os.path.exists(CODEX_INDEX):
         return []
@@ -270,16 +334,33 @@ def collect_codex_threads(within_days=3):
         return []
     out = []
     cutoff = now_ms() - within_days * DAY
+    WAIT_WINDOW = DAY             # completed within a day + not yet returned to = "baton's with you"
+    rollouts = _codex_rollouts()
     for v in best.values():
         if v["ts"] < cutoff:
             continue
         age = now_ms() - v["ts"]
-        status = "working" if age < 30 * MIN else "idle"
+        completed, answer = False, ""
+        if age < WAIT_WINDOW:      # only read the transcript for recently-active threads
+            path = rollouts.get(v["id"])
+            if path:
+                completed, answer = _codex_tail_state(path)
+
+        if age < 30 * MIN and not completed:
+            status = "working"
+            detail = "Codex is working · " + _ago(v["ts"])
+        elif completed and age < WAIT_WINDOW:
+            status = "waiting"
+            detail = (f"Codex answered — baton's with you: {_trunc(answer, 90)}"
+                      if answer else "Codex finished its turn — the baton's with you")
+        else:
+            status = "idle"
+            detail = "Codex thread · last active " + _ago(v["ts"])
+
         out.append({
             "id": "codex_thread:" + v["id"], "source": "codex_thread", "title": v["name"],
             "project": "", "status": status, "lastActive": v["ts"],
-            "detail": "Codex thread · last active " + _ago(v["ts"]),
-            "alive": age < 30 * MIN, "extras": {},
+            "detail": detail, "alive": age < 30 * MIN, "extras": {"answer": answer},
         })
     return out
 

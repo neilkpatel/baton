@@ -232,10 +232,10 @@ class Baton(rumps.App):
         done = [t for t in tracks if t["status"] == "done"]
         working = [t for t in tracks if t["status"] == "working"]
 
-        # Menu bar title: count + a peek at the top pending session's theme.
+        # Menu bar title: just the clean count. The *what* (themes) lives one click
+        # away in the dropdown — a status-bar title truncates and looks sloppy.
         n = len(waiting)
-        self.title = ("🎽 0 waiting" if n == 0
-                      else f"🎽 {n} · " + collectors._trunc(waiting[0]["title"], PEEK_LEN))
+        self.title = f"🎽 {n} waiting"
 
         # Push the hand-off — only if you've opted the banner on (default off).
         cur = {t["id"] for t in waiting}
