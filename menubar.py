@@ -20,7 +20,7 @@ import collectors
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("BATON_PORT", "8787"))
 URL = f"http://127.0.0.1:{PORT}"
-REFRESH_SEC = 20          # collectors are cheap; git is cached ~60s inside the process
+REFRESH_SEC = 10          # ~8ms/poll (git is cached ~60s inside the process, so faster polling is nearly free)
 MAX_ITEMS = 8             # tracks listed per bucket before "…and N more"
 TITLE_LEN = 46            # dropdown item label width
 
