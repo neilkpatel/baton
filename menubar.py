@@ -14,12 +14,21 @@ import os, sys, socket, subprocess, time, json, webbrowser
 
 import rumps
 
+try:
+    import FSEvents
+    import CoreFoundation
+    _HAVE_FSEVENTS = True
+except Exception:
+    _HAVE_FSEVENTS = False
+
 import collectors
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("BATON_PORT", "8787"))
 URL = f"http://127.0.0.1:{PORT}"
-REFRESH_SEC = 5           # ~8ms/poll (git is cached ~60s inside the process)
+POLL_SEC = 5              # pure-poll interval when the file watcher is unavailable
+FALLBACK_SEC = 15         # slow safety-net poll when the watcher IS active (git/recency/relative times)
+WATCH_LATENCY = 0.3       # FSEvents coalesce window → sub-second hand-off detection
 MAX_ITEMS = 8             # tracks listed per bucket before "…and N more"
 TITLE_LEN = 46            # dropdown item label width
 PEEK_LEN = 40             # menu bar one-line peek at the top pending session
@@ -123,15 +132,55 @@ def _ensure_server():
         time.sleep(0.1)
 
 
+_APP = None  # the running Baton instance, so the C-level FSEvents callback can reach it
+
+
+def _fsevents_cb(streamRef, clientInfo, num, paths, flags, ids):
+    """Fires (on the main run loop) the moment ~/.claude/sessions changes."""
+    if _APP is not None:
+        try:
+            _APP.refresh(None)
+        except Exception:
+            pass
+
+
 class Baton(rumps.App):
     def __init__(self):
         super().__init__("🎽", quit_button=None)
         self._waiting_ids = set()   # which sessions were waiting last refresh
         self._primed = False        # skip the first pass so login doesn't fire a burst
         self.prefs = _load_prefs()
-        self._timer = rumps.Timer(self.refresh, REFRESH_SEC)
+        global _APP
+        _APP = self
+        self._fsstream = None
+        watching = self._start_watcher()   # event-driven: refresh the instant a session flips
+        self._timer = rumps.Timer(self.refresh, FALLBACK_SEC if watching else POLL_SEC)
         self._timer.start()
         self.refresh(None)
+
+    def _start_watcher(self):
+        """Watch ~/.claude/sessions with FSEvents so a hand-off is caught in <1s
+        instead of on the next poll — and we idle (no wakeups) in between. Returns
+        False if FSEvents is unavailable, in which case we fall back to POLL_SEC."""
+        if not _HAVE_FSEVENTS:
+            return False
+        try:
+            stream = FSEvents.FSEventStreamCreate(
+                None, _fsevents_cb, None, [collectors.SESSIONS_DIR],
+                FSEvents.kFSEventStreamEventIdSinceNow, WATCH_LATENCY,
+                FSEvents.kFSEventStreamCreateFlagFileEvents
+                | FSEvents.kFSEventStreamCreateFlagNoDefer)
+            if not stream:
+                return False
+            FSEvents.FSEventStreamScheduleWithRunLoop(
+                stream, CoreFoundation.CFRunLoopGetCurrent(),
+                CoreFoundation.kCFRunLoopDefaultMode)
+            if not FSEvents.FSEventStreamStart(stream):
+                return False
+            self._fsstream = stream   # keep a ref so it isn't garbage-collected
+            return True
+        except Exception:
+            return False
 
     # --- menu building ---------------------------------------------------
     def _uniq(self, title, seen):

@@ -1,0 +1,4 @@
+# Baton menu bar app deps (installed into ./.venv, which is gitignored).
+# Rebuild:  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+rumps                      # menu bar app (pulls pyobjc-core + pyobjc-framework-Cocoa)
+pyobjc-framework-FSEvents  # event-driven watch of ~/.claude/sessions (sub-second hand-off detection)
