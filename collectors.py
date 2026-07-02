@@ -360,7 +360,8 @@ def collect_codex_threads(within_days=3):
         out.append({
             "id": "codex_thread:" + v["id"], "source": "codex_thread", "title": v["name"],
             "project": "", "status": status, "lastActive": v["ts"],
-            "detail": detail, "alive": age < 30 * MIN, "extras": {"answer": answer},
+            "detail": detail, "alive": age < 30 * MIN,
+            "extras": {"answer": answer, "threadId": v["id"]},
         })
     return out
 

@@ -106,6 +106,15 @@ def _jump_to_terminal(tty):
         pass
 
 
+def _open_codex_thread(tid):
+    """Jump to a Codex thread via its registered deep link (com.openai.codex)."""
+    try:
+        subprocess.run(["open", f"codex://threads/{tid}"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+    except Exception:
+        pass
+
+
 def _open_path(path):
     try:
         if path and os.path.exists(path):
@@ -206,6 +215,8 @@ class Baton(rumps.App):
         tty = ex.get("tty") or ""
         if src == "claude" and tty.startswith("ttys"):
             return lambda sender, tty=tty: _jump_to_terminal(tty)
+        if src == "codex_thread" and ex.get("threadId"):
+            return lambda sender, tid=ex["threadId"]: _open_codex_thread(tid)
         if src == "git":
             path = os.path.expanduser(track.get("project") or "")
             return lambda sender, path=path: _open_path(path)
