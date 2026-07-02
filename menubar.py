@@ -25,6 +25,26 @@ MAX_ITEMS = 8             # tracks listed per bucket before "…and N more"
 TITLE_LEN = 46            # dropdown item label width
 
 
+NOTIFY_SOUND = "Glass"    # subtle macOS sound on hand-off; set "" for silent
+
+
+def _notify(title, message, subtitle="", sound=NOTIFY_SOUND):
+    """Post a macOS notification via osascript — reliable from an unbundled app
+    (rumps' own notifications require a packaged .app). Best-effort, never raises."""
+    def esc(s):
+        return (s or "").replace("\\", "\\\\").replace('"', '\\"')
+    script = f'display notification "{esc(message)}" with title "{esc(title)}"'
+    if subtitle:
+        script += f' subtitle "{esc(subtitle)}"'
+    if sound:
+        script += f' sound name "{esc(sound)}"'
+    try:
+        subprocess.run(["osascript", "-e", script],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+    except Exception:
+        pass
+
+
 def _server_up():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.25)
@@ -49,6 +69,8 @@ def _ensure_server():
 class Baton(rumps.App):
     def __init__(self):
         super().__init__("🎽", quit_button=None)
+        self._waiting_ids = set()   # which sessions were waiting last refresh
+        self._primed = False        # skip the first pass so login doesn't fire a burst
         self._timer = rumps.Timer(self.refresh, REFRESH_SEC)
         self._timer.start()
         self.refresh(None)
@@ -93,6 +115,21 @@ class Baton(rumps.App):
 
         # Menu bar title = the hero signal: how many batons are waiting on me.
         self.title = f"🎽 {len(waiting)} waiting"
+
+        # Push the hand-off: notify when a session becomes newly waiting.
+        cur = {t["id"] for t in waiting}
+        if self._primed:
+            new = [t for t in waiting if t["id"] not in self._waiting_ids]
+            if len(new) == 1:
+                t = new[0]
+                _notify("🎽 The baton's with you",
+                        collectors._trunc(t["title"], 120),
+                        subtitle=t.get("project") or "")
+            elif len(new) > 1:
+                _notify("🎽 The baton's with you",
+                        f"{len(new)} sessions just handed back to you")
+        self._waiting_ids = cur
+        self._primed = True
 
         stamp = time.strftime("%-I:%M %p", time.localtime(state["generatedAt"] / 1000))
         seen = set()
