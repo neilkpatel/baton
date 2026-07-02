@@ -36,6 +36,10 @@ PEEK_LEN = 40             # menu bar one-line peek at the top pending session
 PREFS_PATH = os.path.expanduser("~/.config/baton/prefs.json")
 NOTIFY_SOUND = ""         # silent by default; the menu bar is the ambient channel
 
+SOURCE_LABEL = {"claude": "Claude Code", "codex_thread": "Codex",
+                "codex_automation": "Automation", "git": "Git", "manual": "Manual"}
+SOURCE_ORDER = ["claude", "codex_thread", "codex_automation", "git", "manual"]
+
 
 # --------------------------------------------------------------------------
 # Preferences — small JSON so the notify choice survives login/restart.
@@ -216,6 +220,24 @@ class Baton(rumps.App):
             rows.append(self._header(f"    …and {len(group) - MAX_ITEMS} more", seen))
         return rows
 
+    def _waiting_section(self, waiting, seen):
+        """The hero bucket, sub-grouped by tool (Claude Code / Codex / …)."""
+        rows = [self._header(f"🎽 Baton's with you ({len(waiting)})", seen)]
+        by_src = {}
+        for t in waiting:
+            by_src.setdefault(t["source"], []).append(t)
+        srcs = ([s for s in SOURCE_ORDER if s in by_src]
+                + [s for s in by_src if s not in SOURCE_ORDER])
+        for s in srcs:
+            items = by_src[s]
+            rows.append(self._header(f"    {SOURCE_LABEL.get(s, s)} ({len(items)})", seen))
+            for t in items[:MAX_ITEMS]:
+                lbl = self._uniq("       " + collectors._trunc(t["title"], TITLE_LEN - 3), seen)
+                rows.append(rumps.MenuItem(lbl, callback=self._action_for(t)))
+            if len(items) > MAX_ITEMS:
+                rows.append(self._header(f"       …and {len(items) - MAX_ITEMS} more", seen))
+        return rows
+
     # --- main loop -------------------------------------------------------
     def refresh(self, _):
         try:
@@ -253,7 +275,7 @@ class Baton(rumps.App):
         seen = set()
         rows = [self._header("↩ Click a session to jump to its Terminal", seen),
                 self._header(f"Baton · updated {stamp}", seen), None]
-        rows += self._section("🎽", "Baton's with you", waiting, seen) + [None]
+        rows += self._waiting_section(waiting, seen) + [None]
         rows += self._section("✅", "Done, unreviewed", done, seen) + [None]
         rows += self._section("🟢", "Working", working, seen) + [None]
 
