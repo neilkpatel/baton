@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Baton — a local command center for everything you have in flight: every AI agent, session, job, and active project, in one view." />
+<title>Baton</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0f14'/%3E%3Cg transform='rotate(-40 16 16)'%3E%3Crect x='9' y='13.5' width='14' height='5' rx='2.5' fill='%232dd4bf'/%3E%3Ccircle cx='9.5' cy='16' r='3' fill='%2338bdf8'/%3E%3Ccircle cx='22.5' cy='16' r='3' fill='%23fbbf24'/%3E%3C/g%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121821; --panel2:#171f2b; --line:#243040;
+    --ink:#e8eef6; --muted:#94a3b8; --soft:#64748b;
+    --accent:#2dd4bf; --accent2:#38bdf8; --gold:#fbbf24; --red:#f87171; --green:#34d399; --purple:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1100px 480px at 78% -8%, rgba(45,212,191,.10), transparent 60%),
+      radial-gradient(900px 420px at 12% -4%, rgba(56,189,248,.08), transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:34px 22px 80px}
+  a{color:var(--accent2);text-decoration:none}
+
+  /* ---- header ---- */
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:20px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .glyph{width:34px;height:34px;flex:none}
+  .brand h1{font-size:27px;letter-spacing:-.6px;margin:0;font-weight:700}
+  .brand .tag{color:var(--muted);font-size:13px;margin-top:2px}
+  .top-right{display:flex;align-items:center;gap:12px}
+  .stamp{color:var(--soft);font-size:12px;font-variant-numeric:tabular-nums}
+  button{font:inherit;cursor:pointer;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:10px;padding:7px 12px;transition:.15s}
+  button:hover{border-color:#33465c;background:#0f1620}
+  button:active{transform:translateY(1px)}
+  .icon-btn{display:inline-flex;align-items:center;gap:7px}
+
+  /* ---- hero ---- */
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px}
+  .stat{
+    position:relative;overflow:hidden;
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--line);border-radius:16px;padding:18px 20px;
+    display:flex;align-items:center;gap:16px;
+  }
+  .stat .big{font-size:42px;font-weight:750;line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+  .stat .lbl{font-size:13px;color:var(--muted)}
+  .stat .lbl b{color:var(--ink);font-weight:650;display:block;font-size:15px;margin-bottom:2px}
+  .stat.waiting .big{color:var(--gold)}
+  .stat.done  .big{color:var(--accent2)}
+  .stat.live::after{
+    content:"";position:absolute;inset:0;border-radius:16px;pointer-events:none;
+    box-shadow:inset 0 0 0 1px currentColor;opacity:.0;animation:pulse 2.4s ease-in-out infinite;
+  }
+  .stat.waiting.live::after{color:var(--gold)} .stat.done.live::after{color:var(--accent2)}
+  @keyframes pulse{0%,100%{opacity:.0}50%{opacity:.5}}
+  .stat .dot{width:11px;height:11px;border-radius:50%;flex:none}
+  .stat.waiting .dot{background:var(--gold);box-shadow:0 0 0 4px rgba(251,191,36,.16)}
+  .stat.done .dot{background:var(--accent2);box-shadow:0 0 0 4px rgba(56,189,248,.16)}
+  .stat.empty{opacity:.6}.stat.empty .big{color:var(--soft)}.stat.empty .dot{background:var(--soft);box-shadow:none}
+
+  /* ---- tabs ---- */
+  nav.tabs{position:sticky;top:0;z-index:30;display:flex;gap:6px;margin:22px 0 18px;padding:10px 0;
+    background:linear-gradient(180deg,rgba(11,15,20,.92),rgba(11,15,20,.62));backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line)}
+  .tab{border:1px solid transparent;border-radius:10px;padding:7px 13px;color:var(--muted);background:transparent}
+  .tab:hover{color:var(--ink);background:#0f1620}
+  .tab.active{color:var(--ink);background:var(--panel);border-color:var(--line)}
+  .tab .badge{display:inline-block;min-width:19px;text-align:center;font-size:11px;font-weight:700;
+    margin-left:7px;padding:1px 6px;border-radius:999px;background:#0c1219;border:1px solid var(--line);color:var(--muted)}
+  .tab.active .badge{color:var(--ink)}
+
+  /* ---- panels ---- */
+  .panel{display:none;animation:fade .22s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ---- bucket ---- */
+  .bucket{margin:6px 0 26px}
+  .bucket-h{display:flex;align-items:center;gap:9px;margin:0 2px 11px;font-size:13px;
+    text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:650}
+  .bucket-h .ct{color:var(--soft);font-weight:600;letter-spacing:0;text-transform:none}
+  .bucket-h .bar{flex:1;height:1px;background:var(--line)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:720px){.grid,.hero{grid-template-columns:1fr}}
+
+  /* ---- card ---- */
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:14px;padding:14px 16px;transition:.15s;position:relative}
+  .card:hover{border-color:#33465c}
+  .card .row1{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+  .pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;letter-spacing:.02em}
+  .pill.working{background:rgba(52,211,153,.13);color:var(--green)}
+  .pill.waiting{background:rgba(251,191,36,.14);color:var(--gold)}
+  .pill.done{background:rgba(56,189,248,.13);color:var(--accent2)}
+  .pill.idle{background:rgba(148,163,184,.12);color:var(--muted)}
+  .pill.scheduled{background:rgba(167,139,250,.14);color:var(--purple)}
+  .pill.manual{background:rgba(45,212,191,.12);color:var(--accent)}
+  .src{font-size:11px;color:var(--soft);margin-left:auto;text-transform:uppercase;letter-spacing:.05em}
+  .card h3{margin:0;font-size:15.5px;font-weight:650;letter-spacing:-.2px}
+  .card .proj{font-size:12px;color:var(--soft);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    margin-top:3px;word-break:break-all}
+  .card .detail{font-size:13.5px;color:var(--muted);margin-top:8px}
+  .card .meta{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:12px;color:var(--soft)}
+  .card .extra{font-size:12px;color:var(--accent);background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.18);
+    padding:1px 8px;border-radius:7px}
+  .card .extra.warn{color:var(--gold);background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.2)}
+  .card .acts{display:flex;gap:7px;margin-top:11px;opacity:0;transition:.15s;flex-wrap:wrap}
+  .card:hover .acts,.card:focus-within .acts{opacity:1}
+  .card .acts button{padding:4px 10px;font-size:12.5px;border-radius:8px}
+  .waiting-card{box-shadow:0 0 0 1px rgba(251,191,36,.18)}
+
+  .empty-state{border:1px dashed var(--line);border-radius:14px;padding:34px 20px;text-align:center;color:var(--soft)}
+  .empty-state .em{font-size:26px;display:block;margin-bottom:8px}
+
+  /* ---- manual lane ---- */
+  .add-row{display:flex;gap:9px;margin:4px 0 18px}
+  .add-row input{flex:1;background:#0d141d;border:1px solid var(--line);border-radius:10px;color:var(--ink);
+    padding:10px 13px;font:inherit}
+  .add-row input:focus{outline:none;border-color:var(--accent)}
+  .add-row button{background:var(--accent);color:#062b27;border-color:var(--accent);font-weight:650}
+  .add-row button:hover{filter:brightness(1.06)}
+  .manual-note{width:100%;margin-top:8px;background:#0d141d;border:1px solid var(--line);border-radius:8px;
+    color:var(--ink);padding:7px 10px;font:inherit;font-size:13px;resize:vertical;min-height:30px}
+  .manual-note:focus{outline:none;border-color:var(--accent)}
+  .chk{appearance:none;width:17px;height:17px;border:1.5px solid var(--soft);border-radius:5px;cursor:pointer;flex:none}
+  .chk:checked{background:var(--green);border-color:var(--green)}
+  .done-line{text-decoration:line-through;color:var(--soft)}
+
+  .section-note{color:var(--soft);font-size:12.5px;margin:-6px 2px 16px}
+  .errbar{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);color:#fca5a5;
+    border-radius:10px;padding:8px 12px;font-size:12.5px;margin-bottom:14px}
+  .mode{font-size:11px;color:var(--soft);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+  .mode.mock{color:var(--gold);border-color:rgba(251,191,36,.3)}
+
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 16px;font-size:13px;
+    opacity:0;transition:.2s;pointer-events:none;z-index:60}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true">
+        <g transform="rotate(-40 16 16)">
+          <rect x="9" y="13.5" width="14" height="5" rx="2.5" fill="#2dd4bf"/>
+          <circle cx="9.5" cy="16" r="3" fill="#38bdf8"/>
+          <circle cx="22.5" cy="16" r="3" fill="#fbbf24"/>
+        </g>
+      </svg>
+      <div>
+        <h1>Baton</h1>
+        <div class="tag">Everything you have in flight — and where the baton is right now.</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <span class="mode" id="mode">live</span>
+      <span class="stamp" id="stamp">—</span>
+      <button class="icon-btn" id="refresh" title="Refresh now">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div class="stat waiting" id="stat-waiting">
+      <span class="dot"></span>
+      <span class="big">0</span>
+      <span class="lbl"><b>The baton's with you</b>agents waiting on your input</span>
+    </div>
+    <div class="stat done" id="stat-done">
+      <span class="dot"></span>
+      <span class="big">0</span>
+      <span class="lbl"><b>Done, unreviewed</b>finished while you were away</span>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="now">Now<span class="badge" id="b-now">0</span></button>
+    <button class="tab" data-tab="project">By Project<span class="badge" id="b-project">0</span></button>
+    <button class="tab" data-tab="scheduled">Scheduled<span class="badge" id="b-scheduled">0</span></button>
+    <button class="tab" data-tab="manual">Manual<span class="badge" id="b-manual">0</span></button>
+  </nav>
+
+  <div id="errbox"></div>
+
+  <section class="panel active" id="tab-now"></section>
+  <section class="panel" id="tab-project"></section>
+  <section class="panel" id="tab-scheduled"></section>
+  <section class="panel" id="tab-manual"></section>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const STORE_KEY = "neil-baton-v1";
+const MIN=60e3, HR=3600e3, DAY=864e5;
+
+/* ---------------- sample data (Phase-1 mock; mirrors /api/state shape) ---------------- */
+// lastActive offsets are minutes-ago, resolved against Date.now() at fetch time so the mock feels live.
+function sampleState(){
+  const now = Date.now();
+  const ago = m => now - m*MIN;
+  const tracks = [
+    // — Claude Code sessions (the star signal) —
+    {id:"claude:55645", source:"claude", title:"baton", project:"~/Desktop/Projects/6_27_26_baton",
+     status:"working", lastActive:ago(0.5), alive:true,
+     detail:"Claude is working — scaffolding the dashboard", extras:{sessionName:"baton build"}},
+    {id:"claude:24893", source:"claude", title:"sup-app", project:"~/Desktop/Projects/sup-app",
+     status:"waiting", lastActive:ago(6), alive:true,
+     detail:"Claude answered and is waiting — the baton's with you", extras:{sessionName:"push-notif bug"}},
+    {id:"claude:8731", source:"claude", title:"research-hub", project:"~/Desktop/Projects/6_21_26_research-hub",
+     status:"waiting", lastActive:ago(23), alive:true,
+     detail:"Asked you a question about the report meta-schema", extras:{sessionName:"hub sync"}},
+    {id:"claude:9577", source:"claude", title:"nehali-site", project:"~/Desktop/Projects/2_18_26_nehali-site",
+     status:"idle", lastActive:ago(2*1440), alive:true,
+     detail:"Idle ~2 days — last turn was an answer", extras:{sessionName:""}},
+
+    // — Codex threads (recency only; no working/waiting signal) —
+    {id:"codex_thread:019f0818", source:"codex_thread", title:"Sawgrass 52-Week High Theme Radar",
+     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"idle", lastActive:ago(190),
+     detail:"Codex thread · last active 3h ago", extras:{}},
+    {id:"codex_thread:019f05f0", source:"codex_thread", title:"Analyze airplane leasing transcripts",
+     project:"~/Desktop/Projects/5_24_26_transcript-radar", status:"idle", lastActive:ago(1440),
+     detail:"Codex thread · last active yesterday", extras:{}},
+
+    // — Git work-in-flight —
+    {id:"git:5_21_26_fam_office_inflection", source:"git", title:"fam_office_inflection",
+     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"working", lastActive:ago(40),
+     detail:"11 changed · last commit 40m ago", extras:{changedCount:11}},
+    {id:"git:5_24_26_transcript-radar", source:"git", title:"transcript-radar",
+     project:"~/Desktop/Projects/5_24_26_transcript-radar", status:"done", lastActive:ago(300),
+     detail:"6 uncommitted · last commit 3 weeks ago — ready to review or commit", extras:{changedCount:6}},
+
+    // — Codex automations (scheduled pipelines) —
+    {id:"automation:retry-inflection-radar", source:"codex_automation", title:"retry-inflection-radar",
+     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"scheduled", lastActive:ago(20),
+     detail:"every 20 min", extras:{nextRun:now+12*MIN, model:"gpt-5", rrule:"FREQ=MINUTELY;INTERVAL=20"}},
+    {id:"automation:daily-ai-job-radar", source:"codex_automation", title:"daily-ai-job-radar",
+     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"scheduled", lastActive:ago(1320),
+     detail:"daily 03:00", extras:{nextRun:now+14*HR, model:"gpt-5", rrule:"FREQ=DAILY;BYHOUR=3"}},
+    {id:"automation:frontier-ai-daily-watchlist", source:"codex_automation", title:"frontier-ai-daily-watchlist",
+     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"scheduled", lastActive:ago(2880),
+     detail:"weekly Mon 03:00", extras:{nextRun:now+2*DAY, model:"gpt-5", rrule:"FREQ=WEEKLY;BYDAY=MO;BYHOUR=3"}},
+    {id:"automation:sawgrass-52wk", source:"codex_automation", title:"sawgrass-52-week-high-theme-radar",
+     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"scheduled", lastActive:ago(60),
+     detail:"weekly Sat 08:00", extras:{nextRun:now+6*DAY, model:"gpt-5", rrule:"FREQ=WEEKLY;BYDAY=SA;BYHOUR=8"}},
+    // an automation that RAN since you last looked → surfaces as done-unreviewed
+    {id:"automation:ziff-davis-daily", source:"codex_automation", title:"ziff-davis-daily",
+     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"done", lastActive:ago(175),
+     detail:"ran 3h ago · output in automation_hub/latest", extras:{lastRun:ago(175), kind:"ran"}},
+  ];
+  const counts = countByStatus(tracks);
+  return {generatedAt:now, tracks, counts, errors:[]};
+}
+
+/* ---------------- localStorage user-state ---------------- */
+function loadStore(){
+  let s={}; try{ s = JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){}
+  s.manualItems ||= []; s.seen ||= {}; s.dismissed ||= {};
+  s.settings ||= {pollMs:25000};
+  return s;
+}
+function saveStore(){ localStorage.setItem(STORE_KEY, JSON.stringify(STORE)); }
+let STORE = loadStore();
+
+/* ---------------- helpers ---------------- */
+function countByStatus(tracks){
+  const c={working:0,waiting:0,done:0,idle:0,scheduled:0};
+  tracks.forEach(t=>{ if(c[t.status]!=null) c[t.status]++; });
+  return c;
+}
+function fmtAgo(ts){
+  if(!ts) return "";
+  const d=Date.now()-ts;
+  if(d<MIN) return "just now";
+  if(d<HR) return Math.round(d/MIN)+"m ago";
+  if(d<DAY) return Math.round(d/HR)+"h ago";
+  const days=Math.round(d/DAY); return days===1?"yesterday":days+"d ago";
+}
+function fmtIn(ts){
+  if(!ts) return "";
+  const d=ts-Date.now();
+  if(d<0) return "overdue";
+  if(d<HR) return "in "+Math.max(1,Math.round(d/MIN))+"m";
+  if(d<DAY) return "in "+Math.round(d/HR)+"h";
+  return "in "+Math.round(d/DAY)+"d";
+}
+const SOURCE_LABEL={claude:"Claude Code",codex_thread:"Codex",codex_automation:"Automation",git:"Git",process:"Process",manual:"Manual"};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),1600);}
+
+/* ---------------- data pipeline: fetch → overlay user-state ---------------- */
+let LAST=null;            // last raw payload
+let MODE="live";
+
+async function fetchState(){
+  try{
+    const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),8000);
+    const r=await fetch("/api/state",{signal:ctrl.signal,cache:"no-store"});
+    clearTimeout(to);
+    if(!r.ok) throw new Error("bad status");
+    MODE="live"; return await r.json();
+  }catch(e){
+    MODE="mock"; return sampleState();
+  }
+}
+
+// Build the rendered track list: machine tracks (overlaid with seen/dismissed) + manual items as tracks.
+function buildTracks(payload){
+  const now=Date.now();
+  const out=[];
+  for(const t of payload.tracks){
+    // dismissed/snoozed → hide while active
+    if(STORE.dismissed[t.id] && STORE.dismissed[t.id]>now) continue;
+    // done + reviewed (seen newer than the thing that made it "done") → drop from done
+    if(t.status==="done"){
+      const anchor=(t.extras&&t.extras.lastRun)||t.lastActive;
+      if(STORE.seen[t.id] && STORE.seen[t.id]>=anchor) continue;
+    }
+    out.push(t);
+  }
+  // manual items
+  for(const m of STORE.manualItems){
+    out.push({id:m.id,source:"manual",title:m.title,project:"",status:m.done?"done":"waiting",
+      lastActive:m.createdAt,detail:m.note||"",alive:true,extras:{manual:true,done:!!m.done,note:m.note||""}});
+  }
+  return out;
+}
+
+/* ---------------- card rendering ---------------- */
+const BUCKETS=[
+  {key:"waiting",  emoji:"🎽", label:"The baton's with you"},
+  {key:"done",     emoji:"✅", label:"Done, unreviewed"},
+  {key:"working",  emoji:"🟢", label:"Working"},
+  {key:"idle",     emoji:"⚪", label:"Idle / stale"},
+];
+const PILL_TEXT={working:"working",waiting:"waiting on you",done:"done",idle:"idle",scheduled:"scheduled",manual:"manual"};
+
+function cardHTML(t){
+  const isManual=t.source==="manual";
+  const extras=t.extras||{};
+  let extraChip="";
+  if(t.source==="git" && extras.changedCount) extraChip=`<span class="extra">${extras.changedCount} changed</span>`;
+  if(t.source==="codex_automation" && extras.nextRun) extraChip=`<span class="extra">${esc(fmtIn(extras.nextRun))}</span>`;
+  if(t.source==="claude" && extras.sessionName) extraChip=`<span class="extra">${esc(extras.sessionName)}</span>`;
+
+  const acts=[];
+  if(t.status==="done" && !isManual) acts.push(`<button data-act="review" data-id="${t.id}">Mark reviewed</button>`);
+  if(!isManual){
+    acts.push(`<button data-act="dismiss" data-id="${t.id}">Snooze</button>`);
+    if(t.project) acts.push(`<button data-act="copy" data-id="${t.id}">Copy path</button>`);
+  }else{
+    acts.push(`<button data-act="m-toggle" data-id="${t.id}">${extras.done?"Reopen":"Mark done"}</button>`);
+    acts.push(`<button data-act="m-del" data-id="${t.id}">Delete</button>`);
+  }
+
+  const titleCls = (isManual && extras.done) ? "done-line" : "";
+  return `<div class="card ${t.status==="waiting"?"waiting-card":""}">
+    <div class="row1">
+      <span class="pill ${t.status}">${PILL_TEXT[t.status]||t.status}</span>
+      <span class="src">${SOURCE_LABEL[t.source]||t.source}</span>
+    </div>
+    <h3 class="${titleCls}">${esc(t.title||"(untitled)")}</h3>
+    ${t.project?`<div class="proj">${esc(t.project)}</div>`:""}
+    ${t.detail?`<div class="detail">${esc(t.detail)}</div>`:""}
+    <div class="meta">${t.lastActive?`<span>${esc(fmtAgo(t.lastActive))}</span>`:""}${extraChip}</div>
+    <div class="acts">${acts.join("")}</div>
+  </div>`;
+}
+
+function bucketHTML(label,emoji,items){
+  if(!items.length) return "";
+  const cards=items.map(cardHTML).join("");
+  return `<div class="bucket">
+    <div class="bucket-h">${emoji} ${esc(label)} <span class="ct">${items.length}</span><span class="bar"></span></div>
+    <div class="grid">${cards}</div></div>`;
+}
+
+/* ---------------- tab renderers ---------------- */
+function renderNow(tracks){
+  const el=document.getElementById("tab-now");
+  const active=tracks.filter(t=>t.status!=="scheduled" && !(t.source==="manual"));
+  // include manual "waiting" items in the waiting bucket so human to-dos sit alongside agent hand-offs
+  const manualOpen=tracks.filter(t=>t.source==="manual" && !(t.extras&&t.extras.done));
+  let html="";
+  for(const b of BUCKETS){
+    let items=active.filter(t=>t.status===b.key);
+    if(b.key==="waiting") items=items.concat(manualOpen);
+    // idle/stale is the least urgent bucket — cap it so it can't bury what needs you
+    if(b.key==="idle" && items.length>6){
+      items.sort((a,c)=>(c.lastActive||0)-(a.lastActive||0));
+      const extra=items.length-6;
+      html+=bucketHTML(b.label,b.emoji,items.slice(0,6));
+      html+=`<div class="section-note" style="margin:-18px 2px 26px">+${extra} more idle — see the By Project tab for everything</div>`;
+    }else{
+      html+=bucketHTML(b.label,b.emoji,items);
+    }
+  }
+  if(!html){
+    html=`<div class="empty-state"><span class="em">🎉</span>Nothing in flight needs you. The baton's all yours.</div>`;
+  }
+  el.innerHTML=html;
+}
+
+function renderProject(tracks){
+  const el=document.getElementById("tab-project");
+  const byProj={};
+  tracks.filter(t=>t.project).forEach(t=>{ (byProj[t.project] ||= []).push(t); });
+  const keys=Object.keys(byProj).sort((a,b)=>{
+    const ma=Math.max(...byProj[a].map(t=>t.lastActive||0)), mb=Math.max(...byProj[b].map(t=>t.lastActive||0));
+    return mb-ma;
+  });
+  if(!keys.length){ el.innerHTML=`<div class="empty-state">No project activity detected.</div>`; return; }
+  el.innerHTML=`<div class="section-note">Every signal for a folder, together — agents, threads, and uncommitted work side by side.</div>`+
+    keys.map(p=>{
+      const items=byProj[p].sort((a,b)=>(b.lastActive||0)-(a.lastActive||0));
+      const name=p.split("/").pop();
+      return `<div class="bucket">
+        <div class="bucket-h">📁 ${esc(name)} <span class="ct">${esc(p)}</span><span class="bar"></span></div>
+        <div class="grid">${items.map(cardHTML).join("")}</div></div>`;
+    }).join("");
+}
+
+function renderScheduled(tracks){
+  const el=document.getElementById("tab-scheduled");
+  const items=tracks.filter(t=>t.status==="scheduled")
+    .sort((a,b)=>((a.extras&&a.extras.nextRun)||Infinity)-((b.extras&&b.extras.nextRun)||Infinity));
+  if(!items.length){ el.innerHTML=`<div class="empty-state">No scheduled automations.</div>`; return; }
+  el.innerHTML=`<div class="section-note">Recurring automations, soonest first. Overdue jobs are flagged.</div>
+    <div class="grid">${items.map(t=>{
+      const nr=t.extras&&t.extras.nextRun; const overdue=nr&&nr<Date.now();
+      const chip=`<span class="extra ${overdue?"warn":""}">${overdue?"overdue":esc(fmtIn(nr))}</span>`;
+      return `<div class="card">
+        <div class="row1"><span class="pill scheduled">scheduled</span><span class="src">Automation</span></div>
+        <h3>${esc(t.title)}</h3>
+        ${t.project?`<div class="proj">${esc(t.project)}</div>`:""}
+        <div class="detail">${esc(t.detail||"")}${t.extras&&t.extras.model?" · "+esc(t.extras.model):""}</div>
+        <div class="meta"><span>next run</span>${chip}</div></div>`;
+    }).join("")}</div>`;
+}
+
+function renderManual(){
+  const el=document.getElementById("tab-manual");
+  const items=STORE.manualItems;
+  const list = items.length ? items.map(m=>{
+    return `<div class="card">
+      <div class="row1">
+        <input type="checkbox" class="chk" data-act="m-toggle" data-id="${m.id}" ${m.done?"checked":""} title="Mark done"/>
+        <span class="pill manual">manual</span><span class="src">you</span>
+      </div>
+      <h3 class="${m.done?"done-line":""}">${esc(m.title)}</h3>
+      <textarea class="manual-note" data-id="${m.id}" placeholder="notes…">${esc(m.note||"")}</textarea>
+      <div class="acts" style="opacity:1"><button data-act="m-del" data-id="${m.id}">Delete</button></div>
+    </div>`;
+  }).join("") : `<div class="empty-state"><span class="em">📝</span>No manual to-dos. Add the things no tool is tracking for you.</div>`;
+  el.innerHTML=`
+    <div class="add-row">
+      <input id="m-input" placeholder="Add a to-do that no agent is tracking…" />
+      <button id="m-add">Add</button>
+    </div>
+    <div class="grid">${list}</div>`;
+  const input=document.getElementById("m-input"), add=document.getElementById("m-add");
+  const doAdd=()=>{ const v=input.value.trim(); if(!v) return;
+    STORE.manualItems.unshift({id:"manual:"+crypto.randomUUID(),title:v,note:"",done:false,createdAt:Date.now()});
+    saveStore(); input.value=""; renderAll(); };
+  add.onclick=doAdd;
+  input.onkeydown=e=>{ if(e.key==="Enter") doAdd(); };
+}
+
+/* ---------------- top-level render ---------------- */
+function setHero(counts,openManual){
+  const w=counts.waiting+openManual, d=counts.done;
+  const sw=document.getElementById("stat-waiting"), sd=document.getElementById("stat-done");
+  sw.querySelector(".big").textContent=w; sd.querySelector(".big").textContent=d;
+  sw.classList.toggle("live",w>0); sw.classList.toggle("empty",w===0);
+  sd.classList.toggle("live",d>0); sd.classList.toggle("empty",d===0);
+}
+function setBadges(counts,tracks){
+  const projCount=new Set(tracks.filter(t=>t.project).map(t=>t.project)).size;
+  document.getElementById("b-now").textContent=counts.waiting+counts.done+counts.working+counts.idle
+    + STORE.manualItems.filter(m=>!m.done).length;
+  document.getElementById("b-project").textContent=projCount;
+  document.getElementById("b-scheduled").textContent=counts.scheduled;
+  document.getElementById("b-manual").textContent=STORE.manualItems.filter(m=>!m.done).length;
+}
+
+function renderAll(){
+  if(!LAST) return;
+  const tracks=buildTracks(LAST);
+  const counts=countByStatus(tracks.filter(t=>t.source!=="manual"));
+  const openManual=STORE.manualItems.filter(m=>!m.done).length;
+  setHero(counts,openManual);
+  setBadges(counts,tracks);
+  renderNow(tracks);
+  renderProject(tracks);
+  renderScheduled(tracks);
+  renderManual();
+  // errors
+  const eb=document.getElementById("errbox");
+  eb.innerHTML=(LAST.errors&&LAST.errors.length)
+    ? `<div class="errbar">⚠ Some signals failed: ${LAST.errors.map(e=>esc(e.source||e)).join(", ")}</div>` : "";
+  // mode chip + stamp
+  const m=document.getElementById("mode");
+  m.textContent = MODE==="mock" ? "mock data" : "live";
+  m.className = "mode"+(MODE==="mock"?" mock":"");
+}
+
+async function refresh(){
+  LAST=await fetchState();
+  lastFetch=Date.now();
+  renderAll();
+}
+
+/* ---------------- events ---------------- */
+document.querySelector("nav.tabs").addEventListener("click",e=>{
+  const b=e.target.closest(".tab"); if(!b) return;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+  b.classList.add("active");
+  document.getElementById("tab-"+b.dataset.tab).classList.add("active");
+});
+
+document.body.addEventListener("click",e=>{
+  const btn=e.target.closest("[data-act]"); if(!btn) return;
+  const act=btn.dataset.act, id=btn.dataset.id;
+  if(act==="review"){ STORE.seen[id]=Date.now(); saveStore(); toast("Marked reviewed"); renderAll(); }
+  else if(act==="dismiss"){ STORE.dismissed[id]=Date.now()+8*HR; saveStore(); toast("Snoozed 8h"); renderAll(); }
+  else if(act==="copy"){ const t=(LAST.tracks||[]).find(x=>x.id===id); const p=t?t.project:"";
+    (navigator.clipboard?navigator.clipboard.writeText(p):Promise.reject()).then(()=>toast("Copied path")).catch(()=>toast(p)); }
+  else if(act==="m-toggle"){ const m=STORE.manualItems.find(x=>x.id===id); if(m){m.done=!m.done; saveStore(); renderAll();} }
+  else if(act==="m-del"){ STORE.manualItems=STORE.manualItems.filter(x=>x.id!==id); saveStore(); toast("Deleted"); renderAll(); }
+});
+// persist manual notes on edit
+document.body.addEventListener("input",e=>{
+  const ta=e.target.closest(".manual-note"); if(!ta) return;
+  const m=STORE.manualItems.find(x=>x.id===ta.dataset.id); if(m){ m.note=ta.value; saveStore(); }
+});
+
+document.getElementById("refresh").onclick=()=>{ refresh(); toast("Refreshed"); };
+
+/* ---------------- polling + stamp ---------------- */
+const HOT_POLL_MS=3000;  // hot lane: feels instant; cost is negligible (git is cached server-side)
+let lastFetch=Date.now();
+function startPolling(){ setInterval(()=>{ if(!document.hidden) refresh(); }, HOT_POLL_MS); }
+setInterval(()=>{ document.getElementById("stamp").textContent="updated "+fmtAgo(lastFetch); },1000);
+
+refresh().then(startPolling);
+</script>
+</body>
+</html>

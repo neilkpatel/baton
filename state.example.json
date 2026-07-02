@@ -1,0 +1,74 @@
+{
+  "_comment": "Sample /api/state payload — the contract between server.py and index.html. SCRUBBED: never put real prompts/cwds here (this file is committed). Timestamps are ms epoch. The frontend falls back to its built-in SAMPLE_TRACKS when /api/state is unreachable, so this file is documentation + offline reference, not loaded directly.",
+  "generatedAt": 1782588000000,
+  "counts": { "working": 2, "waiting": 2, "done": 2, "idle": 2, "scheduled": 4 },
+  "errors": [],
+  "tracks": [
+    {
+      "id": "claude:55645",
+      "source": "claude",
+      "title": "baton",
+      "project": "~/Desktop/Projects/6_27_26_baton",
+      "status": "working",
+      "lastActive": 1782587970000,
+      "alive": true,
+      "detail": "Claude is working",
+      "extras": { "sessionName": "baton build", "pid": 55645 }
+    },
+    {
+      "id": "claude:24893",
+      "source": "claude",
+      "title": "example-app",
+      "project": "~/Desktop/Projects/example-app",
+      "status": "waiting",
+      "lastActive": 1782587640000,
+      "alive": true,
+      "detail": "Claude answered and is waiting — the baton's with you",
+      "extras": { "sessionName": "bugfix", "pid": 24893 }
+    },
+    {
+      "id": "codex_thread:019fxxxx",
+      "source": "codex_thread",
+      "title": "Example research thread",
+      "project": "~/Desktop/Projects/example-research",
+      "status": "idle",
+      "lastActive": 1782577200000,
+      "alive": false,
+      "detail": "Codex thread · last active 3h ago",
+      "extras": {}
+    },
+    {
+      "id": "git:example-research",
+      "source": "git",
+      "title": "example-research",
+      "project": "~/Desktop/Projects/example-research",
+      "status": "done",
+      "lastActive": 1782570000000,
+      "alive": true,
+      "detail": "6 uncommitted · last commit 3 weeks ago — ready to review or commit",
+      "extras": { "changedCount": 6 }
+    },
+    {
+      "id": "automation:example-daily",
+      "source": "codex_automation",
+      "title": "example-daily-radar",
+      "project": "~/Desktop/Projects/example-research",
+      "status": "scheduled",
+      "lastActive": 1782540000000,
+      "alive": true,
+      "detail": "daily 03:00",
+      "extras": { "nextRun": 1782638400000, "lastRun": 1782540000000, "model": "gpt-5", "rrule": "FREQ=DAILY;BYHOUR=3" }
+    },
+    {
+      "id": "manual:example",
+      "source": "manual",
+      "title": "(manual items live in browser localStorage, not in this payload)",
+      "project": "",
+      "status": "waiting",
+      "lastActive": 1782588000000,
+      "alive": true,
+      "detail": "Added by you in the Manual tab; never sent by the server.",
+      "extras": { "manual": true }
+    }
+  ]
+}

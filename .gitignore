@@ -1,0 +1,12 @@
+# Never commit captured machine state — it contains real prompts, cwds, automation prompts.
+state.json
+state.local.json
+*.captured.json
+__pycache__/
+*.pyc
+.DS_Store
+
+# state.example.json IS committed, but must stay scrubbed of real content.
+
+# menu bar app virtualenv (rumps)
+.venv/
