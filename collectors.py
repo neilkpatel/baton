@@ -16,6 +16,7 @@ PROJECTS_DIR = os.path.join(HOME, ".claude", "projects")
 CODEX_INDEX = os.path.join(HOME, ".codex", "session_index.jsonl")
 CODEX_SESSIONS = os.path.join(HOME, ".codex", "sessions")
 CODEX_ARCHIVED = os.path.join(HOME, ".codex", "archived_sessions")
+CODEX_STATE = os.path.join(HOME, ".codex", ".codex-global-state.json")
 AUTOMATIONS_GLOB = os.path.join(HOME, ".codex", "automations", "*", "automation.toml")
 PROJECTS_ROOT = os.path.join(HOME, "Desktop", "Projects")
 
@@ -307,6 +308,30 @@ def _codex_tail_state(path):
     return (bool(completed), answer)
 
 
+_codex_unread_cache = {"ts": 0.0, "ids": set()}
+CODEX_UNREAD_TTL = 15.0
+
+
+def _codex_unread_ids():
+    """The set of Codex thread ids with the blue 'unread' dot — Codex's own signal
+    that a thread has output you haven't looked at. Lives in the Electron UI state
+    under `unread-thread-ids-by-host-v1`. This IS Codex's 'baton's with you'."""
+    if time.time() - _codex_unread_cache["ts"] < CODEX_UNREAD_TTL:
+        return _codex_unread_cache["ids"]
+    ids = set()
+    try:
+        d = json.load(open(CODEX_STATE, encoding="utf-8"))
+        atom = d.get("electron-persisted-atom-state")
+        a = json.loads(atom) if isinstance(atom, str) else atom
+        for host, lst in (a.get("unread-thread-ids-by-host-v1") or {}).items():
+            if isinstance(lst, list):
+                ids.update(lst)
+    except Exception:
+        pass
+    _codex_unread_cache.update(ts=time.time(), ids=ids)
+    return ids
+
+
 def collect_codex_threads(within_days=3):
     if not os.path.exists(CODEX_INDEX):
         return []
@@ -334,34 +359,35 @@ def collect_codex_threads(within_days=3):
         return []
     out = []
     cutoff = now_ms() - within_days * DAY
-    WAIT_WINDOW = DAY             # completed within a day + not yet returned to = "baton's with you"
+    unread = _codex_unread_ids()   # the blue-dot set = genuinely waiting on you
     rollouts = _codex_rollouts()
     for v in best.values():
-        if v["ts"] < cutoff:
+        tid = v["id"]
+        is_unread = tid in unread
+        # Always show unread (a blue dot persists); others only if recent.
+        if not is_unread and v["ts"] < cutoff:
             continue
         age = now_ms() - v["ts"]
-        completed, answer = False, ""
-        if age < WAIT_WINDOW:      # only read the transcript for recently-active threads
-            path = rollouts.get(v["id"])
+        answer = ""
+        if is_unread:
+            path = rollouts.get(tid)
             if path:
-                completed, answer = _codex_tail_state(path)
-
-        if age < 30 * MIN and not completed:
+                _, answer = _codex_tail_state(path)   # agent's closing line, for the detail
+            status = "waiting"
+            detail = (f"Codex — baton's with you: {_trunc(answer, 90)}"
+                      if answer else "Codex has unread output — the baton's with you")
+        elif age < 30 * MIN:
             status = "working"
             detail = "Codex is working · " + _ago(v["ts"])
-        elif completed and age < WAIT_WINDOW:
-            status = "waiting"
-            detail = (f"Codex answered — baton's with you: {_trunc(answer, 90)}"
-                      if answer else "Codex finished its turn — the baton's with you")
         else:
             status = "idle"
             detail = "Codex thread · last active " + _ago(v["ts"])
 
         out.append({
-            "id": "codex_thread:" + v["id"], "source": "codex_thread", "title": v["name"],
+            "id": "codex_thread:" + tid, "source": "codex_thread", "title": v["name"],
             "project": "", "status": status, "lastActive": v["ts"],
             "detail": detail, "alive": age < 30 * MIN,
-            "extras": {"answer": answer, "threadId": v["id"]},
+            "extras": {"answer": answer, "threadId": tid},
         })
     return out
 
