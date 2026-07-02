@@ -559,10 +559,11 @@ def collect_git(force=False):
 # ----------------------------------------------------------------------------
 def collect_all():
     tracks, errors = [], []
+    # git repo tracking intentionally omitted — not relevant to this workflow
+    # (collect_git remains defined but unused; re-add here to bring it back).
     for name, fn in (("claude", collect_claude),
                      ("codex_thread", collect_codex_threads),
-                     ("codex_automation", collect_automations),
-                     ("git", collect_git)):
+                     ("codex_automation", collect_automations)):
         try:
             tracks.extend(fn())
         except Exception as e:

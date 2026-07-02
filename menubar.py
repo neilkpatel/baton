@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Baton menu bar app — the ambient "is the baton with me?" glance.
 
-The menu bar title shows the live waiting count + a peek at the top pending
-session. Click the icon for the full dropdown: every waiting / done / working
-track, each CLICKABLE to jump straight to its Terminal.app tab (git items open
-the project folder). "Open full dashboard" spins up server.py on demand
-(127.0.0.1 only). Read-only; never mutates your session state.
+The menu bar title shows the live waiting count. Click the icon for the full
+dropdown (waiting → working → done): each track is CLICKABLE to jump to it — a
+Claude session raises its Terminal.app tab, a Codex thread opens via codex://
+deep link. "Open full dashboard" spins up server.py on demand (127.0.0.1 only).
+Read-only; never mutates your session state.
 
 Run:  .venv/bin/python menubar.py     (or double-click baton.command)
 Deps: rumps (in .venv). Stdlib otherwise.
@@ -115,15 +115,6 @@ def _open_codex_thread(tid):
         pass
 
 
-def _open_path(path):
-    try:
-        if path and os.path.exists(path):
-            subprocess.run(["open", path], stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL, timeout=5)
-    except Exception:
-        pass
-
-
 def _server_up():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.25)
@@ -217,9 +208,6 @@ class Baton(rumps.App):
             return lambda sender, tty=tty: _jump_to_terminal(tty)
         if src == "codex_thread" and ex.get("threadId"):
             return lambda sender, tid=ex["threadId"]: _open_codex_thread(tid)
-        if src == "git":
-            path = os.path.expanduser(track.get("project") or "")
-            return lambda sender, path=path: _open_path(path)
         return self.open_dashboard
 
     def _section(self, emoji, label, group, seen):
@@ -287,8 +275,8 @@ class Baton(rumps.App):
         rows = [self._header("↩ Click a session to jump to its Terminal", seen),
                 self._header(f"Baton · updated {stamp}", seen), None]
         rows += self._waiting_section(waiting, seen) + [None]
-        rows += self._section("✅", "Done, unreviewed", done, seen) + [None]
         rows += self._section("🟢", "Working", working, seen) + [None]
+        rows += self._section("✅", "Done, unreviewed", done, seen) + [None]
 
         notify_item = rumps.MenuItem("Notify me on hand-off", callback=self.toggle_notify)
         notify_item.state = 1 if self.prefs.get("notify", False) else 0
