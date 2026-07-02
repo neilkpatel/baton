@@ -81,10 +81,11 @@ def _trunc(s, n):
 
 
 def _clean(s):
-    """One-line, collapsed whitespace, harness/command wrappers stripped."""
+    """One-line, collapsed whitespace, harness/command wrappers + image tags stripped."""
     s = (s or "").strip()
     if s.startswith("<") or s.startswith("Caveat:"):
         return ""  # slash-command wrapper, local-command-stdout, or injected caveat
+    s = re.sub(r"\[Image[^\]]*\]", "", s)  # drop pasted-image placeholders ("[Image #2]", "[Image: source: …]")
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -102,11 +103,29 @@ def _text_from_content(c):
     return ""
 
 
+def _ttys():
+    """pid -> controlling tty, one ps call. Terminal.app reports it as '/dev/<tty>',
+    so a click can map a session back to its exact terminal tab."""
+    out = {}
+    try:
+        raw = subprocess.check_output(["ps", "-Ao", "pid=,tty="], text=True)
+    except Exception:
+        return out
+    for line in raw.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            try:
+                out[int(parts[0])] = parts[1].strip()
+            except ValueError:
+                pass
+    return out
+
+
 def _last_context(session_id):
     """Single tail read of the transcript → what this session is *about*.
     Returns dict: role/block of the last meaningful entry (for waiting-detection),
     plus `ask` (most recent real user prompt) and `answer` (last assistant prose)."""
-    empty = {"role": None, "block": None, "ask": "", "answer": ""}
+    empty = {"role": None, "block": None, "ask": "", "answer": "", "topic": "", "aiTitle": ""}
     cands = glob.glob(os.path.join(PROJECTS_DIR, "*", session_id + ".jsonl"))
     if not cands:
         return empty
@@ -118,7 +137,7 @@ def _last_context(session_id):
             chunk = f.read().decode("utf-8", "ignore")
     except Exception:
         return empty
-    last = ask = answer = None
+    last = ask = answer = topic = ai_title = None
     for line in chunk.splitlines():
         line = line.strip()
         if not line:
@@ -128,6 +147,11 @@ def _last_context(session_id):
         except Exception:
             continue
         typ = o.get("type")
+        if typ == "ai-title":                    # Claude Code's own running summary of the session
+            at = _clean(o.get("aiTitle"))
+            if at:
+                ai_title = at
+            continue
         if typ not in ("user", "assistant"):
             continue
         last = o
@@ -138,6 +162,8 @@ def _last_context(session_id):
             continue
         if typ == "user":
             ask = text
+            if len(text) >= 15:      # last *substantive* prompt — survives thin "yes"/"go"/image turns
+                topic = text
         else:
             answer = text
     if not last:
@@ -152,11 +178,13 @@ def _last_context(session_id):
             block = lb.get("type") if isinstance(lb, dict) else "text"
         elif isinstance(c, str):
             block = "text"
-    return {"role": role, "block": block, "ask": ask or "", "answer": answer or ""}
+    return {"role": role, "block": block, "ask": ask or "", "answer": answer or "",
+            "topic": topic or "", "aiTitle": ai_title or ""}
 
 
 def collect_claude():
     out = []
+    ttys = _ttys()
     for f in glob.glob(os.path.join(SESSIONS_DIR, "*.json")):
         try:
             with open(f) as fh:
@@ -174,24 +202,31 @@ def collect_claude():
         updated = s.get("updatedAt") or s.get("statusUpdatedAt") or 0
         raw = s.get("status")
 
-        ctx = _last_context(sid) if sid else {"role": None, "block": None, "ask": "", "answer": ""}
-        ask, answer = ctx["ask"], ctx["answer"]
+        ctx = _last_context(sid) if sid else {"role": None, "block": None, "ask": "",
+                                              "answer": "", "topic": "", "aiTitle": ""}
+        ask, answer, topic = ctx["ask"], ctx["answer"], ctx.get("topic", "")
+        theme = ctx.get("aiTitle", "")
 
-        # A derived name ("neilpatel-29") tells you nothing — prefer the actual ask.
+        # The specific current thing (used in the detail line): last substantive
+        # prompt (skips thin "yes"/"go"/pasted-image turns), then any prompt, then answer.
+        about = topic or ask or answer
+
+        # Headline = the session THEME. Prefer a deliberate (non-derived) name, then
+        # Claude Code's own running summary (ai-title), then the specific ask.
         title = (name if name and not derived
-                 else _trunc(ask, 70) or name or (os.path.basename(cwd) if cwd else sid[:8]))
+                 else theme or _trunc(about, 70) or name or (os.path.basename(cwd) if cwd else sid[:8]))
 
         if not alive:
             status, detail = "idle", "Session ended"
         elif raw == "busy":
             status = "working"
-            detail = f"Working on: {_trunc(ask, 90)}" if ask else "Claude is working"
+            detail = f"Working on: {_trunc(about, 90)}" if about else "Claude is working"
         else:  # alive but not busy → waiting on you, or genuinely idle
             age = now_ms() - updated if updated else DAY * 999
             if ctx["role"] == "assistant" and ctx["block"] == "text" and age < DAY:
                 status = "waiting"
-                detail = (f"Answered — baton's with you: {_trunc(answer, 90)}"
-                          if answer else "Claude answered and is waiting — the baton's with you")
+                detail = (f"Answered — baton's with you: {_trunc(answer or about, 90)}"
+                          if (answer or about) else "Claude answered and is waiting — the baton's with you")
             else:
                 status, detail = "idle", f"Idle — last active {_ago(updated)}"
 
@@ -199,7 +234,8 @@ def collect_claude():
             "id": "claude:" + sid, "source": "claude", "title": title,
             "project": _short(cwd), "status": status, "lastActive": updated,
             "detail": detail, "alive": alive,
-            "extras": {"sessionName": name, "pid": pid, "ask": ask, "answer": answer},
+            "extras": {"sessionName": name, "pid": pid, "tty": ttys.get(pid, ""),
+                       "ask": ask, "answer": answer},
         })
     return out
 

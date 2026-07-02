@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """Baton menu bar app — the ambient "is the baton with me?" glance.
 
-Lives in the macOS menu bar. The title shows the live "baton's with you"
-(waiting) count; the dropdown lists what's waiting on you, what ran while you
-were away, and what's working, and can open the full HTML dashboard.
-
-Reads collectors directly — no server needed to glance. "Open full dashboard"
-spins up server.py on demand (127.0.0.1 only). Read-only; never mutates state.
+The menu bar title shows the live waiting count + a peek at the top pending
+session. Click the icon for the full dropdown: every waiting / done / working
+track, each CLICKABLE to jump straight to its Terminal.app tab (git items open
+the project folder). "Open full dashboard" spins up server.py on demand
+(127.0.0.1 only). Read-only; never mutates your session state.
 
 Run:  .venv/bin/python menubar.py     (or double-click baton.command)
 Deps: rumps (in .venv). Stdlib otherwise.
 """
-import os, sys, socket, subprocess, time, webbrowser
+import os, sys, socket, subprocess, time, json, webbrowser
 
 import rumps
 
@@ -20,17 +19,42 @@ import collectors
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get("BATON_PORT", "8787"))
 URL = f"http://127.0.0.1:{PORT}"
-REFRESH_SEC = 10          # ~8ms/poll (git is cached ~60s inside the process, so faster polling is nearly free)
+REFRESH_SEC = 5           # ~8ms/poll (git is cached ~60s inside the process)
 MAX_ITEMS = 8             # tracks listed per bucket before "…and N more"
 TITLE_LEN = 46            # dropdown item label width
+PEEK_LEN = 40             # menu bar one-line peek at the top pending session
+
+PREFS_PATH = os.path.expanduser("~/.config/baton/prefs.json")
+NOTIFY_SOUND = ""         # silent by default; the menu bar is the ambient channel
 
 
-NOTIFY_SOUND = "Glass"    # subtle macOS sound on hand-off; set "" for silent
+# --------------------------------------------------------------------------
+# Preferences — small JSON so the notify choice survives login/restart.
+# --------------------------------------------------------------------------
+def _load_prefs():
+    d = {"notify": False}      # A: banner OFF by default; menu bar is ambient
+    try:
+        with open(PREFS_PATH) as f:
+            d.update(json.load(f))
+    except Exception:
+        pass
+    return d
 
 
+def _save_prefs(prefs):
+    try:
+        os.makedirs(os.path.dirname(PREFS_PATH), exist_ok=True)
+        with open(PREFS_PATH, "w") as f:
+            json.dump(prefs, f)
+    except Exception:
+        pass
+
+
+# --------------------------------------------------------------------------
+# Actions
+# --------------------------------------------------------------------------
 def _notify(title, message, subtitle="", sound=NOTIFY_SOUND):
-    """Post a macOS notification via osascript — reliable from an unbundled app
-    (rumps' own notifications require a packaged .app). Best-effort, never raises."""
+    """macOS notification via osascript — reliable from an unbundled app."""
     def esc(s):
         return (s or "").replace("\\", "\\\\").replace('"', '\\"')
     script = f'display notification "{esc(message)}" with title "{esc(title)}"'
@@ -41,6 +65,39 @@ def _notify(title, message, subtitle="", sound=NOTIFY_SOUND):
     try:
         subprocess.run(["osascript", "-e", script],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+    except Exception:
+        pass
+
+
+def _jump_to_terminal(tty):
+    """Raise the Terminal.app tab whose tty matches. tty like 'ttys002'."""
+    dev = tty if tty.startswith("/dev/") else "/dev/" + tty
+    script = (
+        'tell application "Terminal"\n'
+        '  activate\n'
+        '  repeat with w in windows\n'
+        '    repeat with t in tabs of w\n'
+        f'      if (tty of t) is "{dev}" then\n'
+        '        set selected of t to true\n'
+        '        set index of w to 1\n'
+        '        return\n'
+        '      end if\n'
+        '    end repeat\n'
+        '  end repeat\n'
+        'end tell'
+    )
+    try:
+        subprocess.run(["osascript", "-e", script],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+    except Exception:
+        pass
+
+
+def _open_path(path):
+    try:
+        if path and os.path.exists(path):
+            subprocess.run(["open", path], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=5)
     except Exception:
         pass
 
@@ -71,28 +128,41 @@ class Baton(rumps.App):
         super().__init__("🎽", quit_button=None)
         self._waiting_ids = set()   # which sessions were waiting last refresh
         self._primed = False        # skip the first pass so login doesn't fire a burst
+        self.prefs = _load_prefs()
         self._timer = rumps.Timer(self.refresh, REFRESH_SEC)
         self._timer.start()
         self.refresh(None)
 
-    # --- helpers ---------------------------------------------------------
+    # --- menu building ---------------------------------------------------
     def _uniq(self, title, seen):
-        """rumps keys menu items by title; two ~/ sessions can collide.
-        Append invisible thin-spaces to guarantee a unique key, same look."""
+        """rumps keys menu items by title; two sessions can collide.
+        Append invisible spaces to guarantee a unique key, same look."""
         while title in seen:
-            title += " "
+            title += " "
         seen.add(title)
         return title
 
     def _header(self, text, seen):
-        it = rumps.MenuItem(self._uniq(text, seen))  # no callback => greyed/disabled
-        return it
+        return rumps.MenuItem(self._uniq(text, seen))  # no callback => greyed/disabled
+
+    def _action_for(self, track):
+        """Clicking a track jumps to where it lives: Claude → its Terminal tab,
+        git → the project folder, everything else → the dashboard."""
+        ex = track.get("extras") or {}
+        src = track.get("source")
+        tty = ex.get("tty") or ""
+        if src == "claude" and tty.startswith("ttys"):
+            return lambda sender, tty=tty: _jump_to_terminal(tty)
+        if src == "git":
+            path = os.path.expanduser(track.get("project") or "")
+            return lambda sender, path=path: _open_path(path)
+        return self.open_dashboard
 
     def _section(self, emoji, label, group, seen):
         rows = [self._header(f"{emoji} {label} ({len(group)})", seen)]
         for t in group[:MAX_ITEMS]:
             lbl = self._uniq("    " + collectors._trunc(t["title"], TITLE_LEN), seen)
-            rows.append(rumps.MenuItem(lbl, callback=self.open_dashboard))
+            rows.append(rumps.MenuItem(lbl, callback=self._action_for(t)))
         if len(group) > MAX_ITEMS:
             rows.append(self._header(f"    …and {len(group) - MAX_ITEMS} more", seen))
         return rows
@@ -113,33 +183,38 @@ class Baton(rumps.App):
         done = [t for t in tracks if t["status"] == "done"]
         working = [t for t in tracks if t["status"] == "working"]
 
-        # Menu bar title = the hero signal: how many batons are waiting on me.
-        self.title = f"🎽 {len(waiting)} waiting"
+        # Menu bar title: count + a peek at the top pending session's theme.
+        n = len(waiting)
+        self.title = ("🎽 0 waiting" if n == 0
+                      else f"🎽 {n} · " + collectors._trunc(waiting[0]["title"], PEEK_LEN))
 
-        # Push the hand-off: notify when a session becomes newly waiting.
+        # Push the hand-off — only if you've opted the banner on (default off).
         cur = {t["id"] for t in waiting}
-        if self._primed:
+        if self._primed and self.prefs.get("notify", False):
             new = [t for t in waiting if t["id"] not in self._waiting_ids]
             if len(new) == 1:
-                t = new[0]
-                _notify("🎽 The baton's with you",
-                        collectors._trunc(t["title"], 120),
-                        subtitle=t.get("project") or "")
+                _notify("🎽 The baton's with you", collectors._trunc(new[0]["title"], 120),
+                        subtitle=new[0].get("project") or "")
             elif len(new) > 1:
-                _notify("🎽 The baton's with you",
-                        f"{len(new)} sessions just handed back to you")
+                _notify("🎽 The baton's with you", f"{len(new)} sessions just handed back to you")
         self._waiting_ids = cur
         self._primed = True
 
         stamp = time.strftime("%-I:%M %p", time.localtime(state["generatedAt"] / 1000))
         seen = set()
-        rows = [self._header(f"Baton · updated {stamp}", seen), None]
+        rows = [self._header("↩ Click a session to jump to its Terminal", seen),
+                self._header(f"Baton · updated {stamp}", seen), None]
         rows += self._section("🎽", "Baton's with you", waiting, seen) + [None]
         rows += self._section("✅", "Done, unreviewed", done, seen) + [None]
         rows += self._section("🟢", "Working", working, seen) + [None]
+
+        notify_item = rumps.MenuItem("Notify me on hand-off", callback=self.toggle_notify)
+        notify_item.state = 1 if self.prefs.get("notify", False) else 0
         rows += [
             rumps.MenuItem("Open full dashboard →", callback=self.open_dashboard),
             rumps.MenuItem("Refresh now", callback=self.refresh),
+            None,
+            notify_item,
             None,
             rumps.MenuItem("Quit Baton", callback=rumps.quit_application),
         ]
@@ -150,6 +225,11 @@ class Baton(rumps.App):
     def open_dashboard(self, _):
         _ensure_server()
         webbrowser.open(URL)
+
+    def toggle_notify(self, sender):
+        self.prefs["notify"] = not self.prefs.get("notify", False)
+        sender.state = 1 if self.prefs["notify"] else 0
+        _save_prefs(self.prefs)
 
 
 if __name__ == "__main__":
