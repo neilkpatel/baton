@@ -1,4 +1,13 @@
-# Baton 🎽
+<p align="center">
+  <img src="docs/banner.png" alt="Baton — know which AI agent needs you, right now" width="920">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/macOS-menu%20bar-2dd4bf?logo=apple&logoColor=white&labelColor=0b0f14" alt="macOS menu bar">
+  <img src="https://img.shields.io/badge/Python-3.9%2B-38bdf8?logo=python&logoColor=white&labelColor=0b0f14" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20·%20Codex-fbbf24?labelColor=0b0f14" alt="works with Claude Code and Codex">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a78bfa?labelColor=0b0f14" alt="MIT license"></a>
+</p>
 
 **A local command center for every AI agent you have in flight** — Claude Code sessions and
 Codex threads, in one glance, so you always know *which one needs you right now*.
@@ -13,7 +22,7 @@ It lives in your **macOS menu bar** (a relay runner + "N batons for you"); click
 picture, click any session to **jump straight to it**.
 
 <p align="center">
-  <img src="docs/menubar.png" width="340" alt="Baton menu bar dropdown — waiting sessions grouped by tool, then Working and Done">
+  <img src="docs/demo.gif" width="800" alt="Demo — agents hand back while you work, the count ticks up, one click jumps to the session and clears it">
 </p>
 
 ## Install
@@ -33,6 +42,7 @@ git clone https://github.com/neilkpatel/baton.git && cd baton
 bash install.sh                  # or: bash install.sh --no-autostart
 ```
 
+**Update:** re-run the same one-liner — it pulls the latest into `~/.baton` and restarts the app.
 Remove the autostart anytime with `bash install.sh --uninstall`.
 
 **Requirements:** macOS, Python 3.9+ (3.11+ enables Codex scheduled-automation tracking), and

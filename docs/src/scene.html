@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121821; --line:#243040; --ink:#e8eef6; --muted:#94a3b8;
+    --accent:#2dd4bf; --accent2:#38bdf8; --gold:#fbbf24; --purple:#a78bfa;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden}
+  body{
+    background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .glow{position:absolute;border-radius:50%;filter:blur(90px);opacity:.35;pointer-events:none}
+  .glow.teal{width:520px;height:520px;background:var(--accent)}
+  .glow.purple{width:480px;height:480px;background:var(--purple)}
+  .glow.sky{width:400px;height:400px;background:var(--accent2);opacity:.22}
+
+  /* ---------- banner / social ---------- */
+  .brand{position:absolute;display:flex;align-items:center;gap:36px}
+  .brand img.runner{filter:drop-shadow(0 6px 30px rgba(45,212,191,.45))}
+  .wordmark{font-size:92px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .wordmark .accent{background:linear-gradient(100deg,var(--accent),var(--accent2) 55%,var(--purple));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .tagline{font-size:30px;color:var(--ink);opacity:.92;margin-top:18px;font-weight:600;letter-spacing:-.01em}
+  .sub{font-size:21px;color:var(--muted);margin-top:12px;font-weight:500}
+  .sub b{color:var(--accent);font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:10px;margin-top:26px;padding:12px 22px;
+    background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.35);border-radius:12px;
+    font:500 19px ui-monospace,"SF Mono",Menlo,monospace;color:var(--accent)}
+  .shot{position:absolute;border-radius:14px;
+    box-shadow:0 30px 80px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.06)}
+
+  /* ---------- gif frame ---------- */
+  .menubar{position:absolute;top:0;left:0;right:0;height:44px;
+    background:rgba(18,24,33,.92);border-bottom:1px solid rgba(255,255,255,.07);
+    display:flex;align-items:center;justify-content:flex-end;padding:0 18px;gap:20px}
+  .mb-item{display:flex;align-items:center;gap:9px}
+  .mb-title{font-size:19px;font-weight:500;color:var(--ink)}
+  .mb-dim{color:var(--muted);font-size:17px;font-weight:500;letter-spacing:.01em}
+  .mb-glyph{width:20px;height:12px;border:1.5px solid var(--muted);border-radius:3px;opacity:.7}
+  .mb-glyph.dot{width:12px;height:12px;border-radius:50%}
+  .dropdown{position:absolute;top:50px;transform-origin:top right;border-radius:12px;
+    box-shadow:0 30px 70px rgba(0,0,0,.7)}
+  .hl{position:absolute;border-radius:8px;background:rgba(56,189,248,.28);
+    outline:1.5px solid rgba(56,189,248,.55)}
+  .cursor{position:absolute;width:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+  .caption{position:absolute;left:40px;bottom:34px;max-width:400px}
+  .caption h2{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.25}
+  .caption h2 .accent{background:linear-gradient(100deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .caption p{font-size:19px;color:var(--muted);margin-top:12px;line-height:1.45;font-weight:500}
+</style>
+</head>
+<body>
+<script>
+const q = new URLSearchParams(location.search);
+const mode = q.get("mode") || "banner";
+const f = parseInt(q.get("f") || "0", 10);
+
+const RUNNER = "../../icons/baton-color.svg";
+const MENU   = "../menubar.png";           // real dropdown capture (fake demo data)
+
+function el(html){ document.body.insertAdjacentHTML("beforeend", html); }
+
+if (mode === "banner") {
+  /* 1280x320 README banner */
+  el(`<div class="glow teal"   style="left:-140px;top:-260px"></div>
+      <div class="glow purple" style="right:-120px;bottom:-300px"></div>
+      <div class="brand" style="left:90px;top:50%;transform:translateY(-50%)">
+        <img class="runner" src="${RUNNER}" width="185" height="185">
+        <div>
+          <div class="wordmark">Baton<span class="accent">.</span></div>
+          <div class="tagline">Know which AI agent needs you — right now.</div>
+          <div class="sub"><b>Claude Code</b> + <b>Codex</b> in your macOS menu bar · click to jump</div>
+        </div>
+      </div>`);
+}
+
+if (mode === "social") {
+  /* 1280x640 GitHub social preview */
+  el(`<div class="glow teal"   style="left:-160px;top:-240px"></div>
+      <div class="glow purple" style="right:-100px;bottom:-260px"></div>
+      <div class="glow sky"    style="left:40%;top:60%"></div>
+      <div class="brand" style="left:84px;top:120px;align-items:flex-start">
+        <div>
+          <div style="display:flex;align-items:center;gap:30px">
+            <img class="runner" src="${RUNNER}" width="150" height="150">
+            <div class="wordmark" style="font-size:104px">Baton<span class="accent">.</span></div>
+          </div>
+          <div class="tagline" style="max-width:600px;margin-top:34px;font-size:34px;line-height:1.3">
+            Know which AI agent<br>needs you — <span style="color:var(--gold)">right now</span>.</div>
+          <div class="sub" style="font-size:23px;margin-top:20px"><b>Claude Code</b> + <b>Codex</b> · macOS menu bar</div>
+          <div class="pill">curl … /install.sh | bash</div>
+        </div>
+      </div>
+      <img class="shot" src="${MENU}" width="330"
+           style="right:64px;top:44px;transform:rotate(2.5deg)">`);
+}
+
+if (mode === "frame") {
+  /* 800x500 GIF frame, state driven by f */
+  // timeline (frame numbers):
+  //  0- 5  quiet menu bar, icon only
+  //  6-14  count ticks 1 → 2 → 3
+  // 15-19  dropdown scales in
+  // 20-29  cursor moves to first waiting item, highlight
+  // 30-32  click (highlight flashes brighter)
+  // 33-39  dropdown gone, count = 2
+  const count  = f < 6 ? 0 : f < 9 ? 1 : f < 12 ? 2 : f < 33 ? 3 : 2;
+  const dd     = f >= 15 && f < 33;
+  const ddT    = Math.min(1, (f - 15) / 4);                    // scale-in progress
+  const curOn  = f >= 20 && f < 33;
+  const curT   = Math.min(1, (f - 20) / 7);                    // cursor travel progress
+  const hlOn   = f >= 26 && f < 33;
+  const click  = f >= 30 && f < 33;
+
+  el(`<div class="glow teal"   style="left:-180px;bottom:-320px;opacity:.18"></div>
+      <div class="glow purple" style="right:-200px;bottom:-340px;opacity:.16"></div>`);
+
+  // menu bar strip
+  const title = count > 0 ? `${count} baton${count > 1 ? "s" : ""} for you` : "";
+  el(`<div class="menubar">
+        <div class="mb-item" style="gap:11px">
+          <img src="${RUNNER}" width="26" height="26">
+          ${title ? `<span class="mb-title">${title}</span>` : ""}
+        </div>
+        <div class="mb-glyph"></div>
+        <div class="mb-glyph dot"></div>
+        <span class="mb-dim">Thu Jul 9&nbsp; 11:08 AM</span>
+      </div>`);
+
+  // dropdown (real capture) — anchored under the actual runner icon, geometry measured
+  if (dd) {
+    const icon = document.querySelector(".menubar img");
+    const r = icon.getBoundingClientRect();
+    const ddW = 260, ddH = ddW * 1108 / 668;                 // menubar.png is 668x1108
+    const ddLeft = Math.min(r.left - 10, 800 - ddW - 16);
+    const ddTop = 50;
+    el(`<img class="dropdown" src="${MENU}" width="${ddW}"
+             style="left:${ddLeft}px;top:${ddTop}px;
+                    transform:scale(${0.9 + 0.1 * ddT});opacity:${ddT}">`);
+    // first waiting item ("Fix push-notification permissions bug"), as fractions of the shot
+    const hlTop = ddTop + ddH * 0.250, hlH = ddH * 0.040;
+    if (hlOn) {
+      const glow = click ? "background:rgba(56,189,248,.45);" : "";
+      el(`<div class="hl" style="left:${ddLeft + ddW * 0.06}px;top:${hlTop}px;
+               width:${ddW * 0.88}px;height:${hlH}px;${glow}"></div>`);
+    }
+    if (curOn) {
+      const x0 = 740, y0 = 130;                              // travel from lower right
+      const x1 = ddLeft + ddW * 0.40, y1 = hlTop + hlH * 0.10;
+      const x = x0 + (x1 - x0) * curT, y = y0 + (y1 - y0) * curT;
+      el(`<svg class="cursor" viewBox="0 0 24 24" style="left:${x}px;top:${y}px">
+            <path d="M5 3 L19 12 L12 13 L9 20 Z" fill="#fff" stroke="#000" stroke-width="1.4"/>
+          </svg>`);
+    }
+  }
+
+  // caption
+  const cap =
+    f < 6   ? ["Heads-down in one session…", "Baton watches the rest."] :
+    f < 15  ? [`<span class="accent">Agents hand back</span> while you work`, "The count is live — under a second, via FSEvents."] :
+    f < 33  ? ["One glance, grouped by tool", "Claude Code and Codex, waiting → working → done."] :
+              ["Click to jump — and clear it", "Straight to that Terminal tab or Codex thread."];
+  el(`<div class="caption" style="max-width:290px"><h2>${cap[0]}</h2><p>${cap[1]}</p></div>`);
+}
+</script>
+</body>
+</html>
