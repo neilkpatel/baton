@@ -198,7 +198,7 @@
 
 <script>
 "use strict";
-const STORE_KEY = "neil-baton-v1";
+const STORE_KEY = "baton-v1";
 const MIN=60e3, HR=3600e3, DAY=864e5;
 
 /* ---------------- sample data (Phase-1 mock; mirrors /api/state shape) ---------------- */
@@ -208,51 +208,51 @@ function sampleState(){
   const ago = m => now - m*MIN;
   const tracks = [
     // — Claude Code sessions (the star signal) —
-    {id:"claude:55645", source:"claude", title:"baton", project:"~/Desktop/Projects/6_27_26_baton",
+    {id:"claude:55645", source:"claude", title:"baton", project:"~/Projects/baton",
      status:"working", lastActive:ago(0.5), alive:true,
      detail:"Claude is working — scaffolding the dashboard", extras:{sessionName:"baton build"}},
-    {id:"claude:24893", source:"claude", title:"sup-app", project:"~/Desktop/Projects/sup-app",
+    {id:"claude:24893", source:"claude", title:"webapp", project:"~/Projects/webapp",
      status:"waiting", lastActive:ago(6), alive:true,
      detail:"Claude answered and is waiting — the baton's with you", extras:{sessionName:"push-notif bug"}},
-    {id:"claude:8731", source:"claude", title:"research-hub", project:"~/Desktop/Projects/6_21_26_research-hub",
+    {id:"claude:8731", source:"claude", title:"docs-site", project:"~/Projects/docs-site",
      status:"waiting", lastActive:ago(23), alive:true,
-     detail:"Asked you a question about the report meta-schema", extras:{sessionName:"hub sync"}},
-    {id:"claude:9577", source:"claude", title:"nehali-site", project:"~/Desktop/Projects/2_18_26_nehali-site",
+     detail:"Asked you a question about the nav structure", extras:{sessionName:"docs revamp"}},
+    {id:"claude:9577", source:"claude", title:"portfolio", project:"~/Projects/portfolio",
      status:"idle", lastActive:ago(2*1440), alive:true,
      detail:"Idle ~2 days — last turn was an answer", extras:{sessionName:""}},
 
     // — Codex threads (recency only; no working/waiting signal) —
-    {id:"codex_thread:019f0818", source:"codex_thread", title:"Sawgrass 52-Week High Theme Radar",
-     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"idle", lastActive:ago(190),
+    {id:"codex_thread:019f0818", source:"codex_thread", title:"Refactor billing webhooks",
+     project:"~/Projects/api-server", status:"idle", lastActive:ago(190),
      detail:"Codex thread · last active 3h ago", extras:{}},
-    {id:"codex_thread:019f05f0", source:"codex_thread", title:"Analyze airplane leasing transcripts",
-     project:"~/Desktop/Projects/5_24_26_transcript-radar", status:"idle", lastActive:ago(1440),
+    {id:"codex_thread:019f05f0", source:"codex_thread", title:"Analyze churn cohort data",
+     project:"~/Projects/analytics", status:"idle", lastActive:ago(1440),
      detail:"Codex thread · last active yesterday", extras:{}},
 
     // — Git work-in-flight —
-    {id:"git:5_21_26_fam_office_inflection", source:"git", title:"fam_office_inflection",
-     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"working", lastActive:ago(40),
+    {id:"git:api-server", source:"git", title:"api-server",
+     project:"~/Projects/api-server", status:"working", lastActive:ago(40),
      detail:"11 changed · last commit 40m ago", extras:{changedCount:11}},
-    {id:"git:5_24_26_transcript-radar", source:"git", title:"transcript-radar",
-     project:"~/Desktop/Projects/5_24_26_transcript-radar", status:"done", lastActive:ago(300),
+    {id:"git:analytics", source:"git", title:"analytics",
+     project:"~/Projects/analytics", status:"done", lastActive:ago(300),
      detail:"6 uncommitted · last commit 3 weeks ago — ready to review or commit", extras:{changedCount:6}},
 
     // — Codex automations (scheduled pipelines) —
-    {id:"automation:retry-inflection-radar", source:"codex_automation", title:"retry-inflection-radar",
-     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"scheduled", lastActive:ago(20),
+    {id:"automation:retry-failed-jobs", source:"codex_automation", title:"retry-failed-jobs",
+     project:"~/Projects/api-server", status:"scheduled", lastActive:ago(20),
      detail:"every 20 min", extras:{nextRun:now+12*MIN, model:"gpt-5", rrule:"FREQ=MINUTELY;INTERVAL=20"}},
-    {id:"automation:daily-ai-job-radar", source:"codex_automation", title:"daily-ai-job-radar",
-     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"scheduled", lastActive:ago(1320),
+    {id:"automation:daily-metrics-digest", source:"codex_automation", title:"daily-metrics-digest",
+     project:"~/Projects/analytics", status:"scheduled", lastActive:ago(1320),
      detail:"daily 03:00", extras:{nextRun:now+14*HR, model:"gpt-5", rrule:"FREQ=DAILY;BYHOUR=3"}},
-    {id:"automation:frontier-ai-daily-watchlist", source:"codex_automation", title:"frontier-ai-daily-watchlist",
-     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"scheduled", lastActive:ago(2880),
+    {id:"automation:weekly-dependency-audit", source:"codex_automation", title:"weekly-dependency-audit",
+     project:"~/Projects/webapp", status:"scheduled", lastActive:ago(2880),
      detail:"weekly Mon 03:00", extras:{nextRun:now+2*DAY, model:"gpt-5", rrule:"FREQ=WEEKLY;BYDAY=MO;BYHOUR=3"}},
-    {id:"automation:sawgrass-52wk", source:"codex_automation", title:"sawgrass-52-week-high-theme-radar",
-     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"scheduled", lastActive:ago(60),
+    {id:"automation:weekly-changelog", source:"codex_automation", title:"weekly-changelog",
+     project:"~/Projects/webapp", status:"scheduled", lastActive:ago(60),
      detail:"weekly Sat 08:00", extras:{nextRun:now+6*DAY, model:"gpt-5", rrule:"FREQ=WEEKLY;BYDAY=SA;BYHOUR=8"}},
     // an automation that RAN since you last looked → surfaces as done-unreviewed
-    {id:"automation:ziff-davis-daily", source:"codex_automation", title:"ziff-davis-daily",
-     project:"~/Desktop/Projects/5_21_26_fam_office_inflection", status:"done", lastActive:ago(175),
+    {id:"automation:nightly-backup-check", source:"codex_automation", title:"nightly-backup-check",
+     project:"~/Projects/api-server", status:"done", lastActive:ago(175),
      detail:"ran 3h ago · output in automation_hub/latest", extras:{lastRun:ago(175), kind:"ran"}},
   ];
   const counts = countByStatus(tracks);

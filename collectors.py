@@ -395,7 +395,10 @@ def collect_codex_threads(within_days=3):
 # ----------------------------------------------------------------------------
 # Codex automations — scheduled pipelines (+ a minimal RRULE engine)
 # ----------------------------------------------------------------------------
-import tomllib
+try:
+    import tomllib          # Python 3.11+; on older Pythons the automations collector is skipped
+except ImportError:
+    tomllib = None
 
 _WD = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
 
@@ -488,6 +491,8 @@ def _describe_rrule(rrule_str):
 
 def collect_automations():
     out = []
+    if tomllib is None:
+        return out
     now_dt = datetime.now()
     for f in glob.glob(AUTOMATIONS_GLOB):
         try:

@@ -9,10 +9,34 @@ machine already emits (zero manual entry) and surfaces the one that matters: the
 **🎽 "the baton's with you"** bucket — an agent ran its leg and handed back to you. That's the
 thing that's easy to drop when you're looking elsewhere.
 
-It lives in your **macOS menu bar** (`🎽 N waiting`); click for the full picture, click any
-session to **jump straight to it**.
+It lives in your **macOS menu bar** (a relay runner + "N batons for you"); click for the full
+picture, click any session to **jump straight to it**.
 
----
+<p align="center">
+  <img src="docs/menubar.png" width="340" alt="Baton menu bar dropdown — waiting sessions grouped by tool, then Working and Done">
+</p>
+
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/neilkpatel/baton/main/install.sh | bash
+```
+
+That clones Baton into `~/.baton`, sets up an isolated Python venv (the only deps are `rumps`
+and the FSEvents binding), and installs a login LaunchAgent — the 🎽 appears in your menu bar
+immediately, starts at login, and relaunches if it crashes.
+
+Prefer to look first? Clone and run the same script from the checkout:
+
+```bash
+git clone https://github.com/neilkpatel/baton.git && cd baton
+bash install.sh                  # or: bash install.sh --no-autostart
+```
+
+Remove the autostart anytime with `bash install.sh --uninstall`.
+
+**Requirements:** macOS, Python 3.9+ (3.11+ enables Codex scheduled-automation tracking), and
+Claude Code and/or Codex — Baton shows whatever it finds; either alone is fine.
 
 ## What it does
 
@@ -28,24 +52,26 @@ session to **jump straight to it**.
   - **Claude Code** — a session that's idle with an assistant answer as its last turn = waiting.
   - **Codex** — mirrors Codex's own **unread (blue-dot)** state, so a thread you've already
     opened doesn't nag you.
+- **Click-to-acknowledge** — jumping to a waiting session clears it from the count until it
+  produces a *new* answer, and the session you currently have open in Terminal isn't counted
+  while you're looking at it. The number goes down when you deal with things.
 - **Optional hand-off notifications** — off by default (the menu bar is the calm channel); one
   toggle turns on a banner the moment a baton comes back.
 - **Recognizable labels** — each session is titled by Claude Code's own running summary
   (`ai-title`), so you know what it's about at a glance.
 
-## Run it
+## The dashboard
 
-```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python menubar.py          # 🎽 appears in your menu bar
-```
-
-Auto-start at login is handled by a `launchd` LaunchAgent (`com.neil.baton-menubar`). There's
-also a full HTML dashboard (`server.py` + `index.html`) for the rich multi-tab view:
+There's also a full HTML dashboard (`server.py` + `index.html`) for the rich multi-tab view —
+"Open full dashboard →" in the dropdown, or:
 
 ```bash
 bash start.sh        # python3 server.py --port 8787  → http://127.0.0.1:8787
 ```
+
+<p align="center">
+  <img src="docs/dashboard.png" width="720" alt="Baton dashboard — everything in flight, and where the baton is right now">
+</p>
 
 ## How it works
 
@@ -75,11 +101,17 @@ dependency-free vanilla HTML/CSS/JS. No build step, no framework.
 
 ## Security & privacy
 
-Entirely local. The payload contains your real prompts and working directories, so the dashboard
-server **binds to `127.0.0.1` only** — never `0.0.0.0`. Captured state (`state.json`) is
-git-ignored; only the scrubbed `state.example.json` is committed. The repo is private.
+Entirely local, strictly read-only over `~/.claude` and `~/.codex` — Baton never mutates your
+session state and nothing leaves your machine. The live payload contains your real prompts and
+working directories, so the dashboard server **binds to `127.0.0.1` only** — never `0.0.0.0`.
+Captured state (`state.json`) is git-ignored; only scrubbed sample data is committed.
 
 ## Files
 
 `menubar.py` (the app) · `collectors.py` (the signal readers) · `server.py` + `index.html`
-(dashboard) · `start.sh` · `requirements.txt` · `state.example.json` (the `track` contract).
+(dashboard) · `install.sh` · `start.sh` · `requirements.txt` · `state.example.json` (the
+`track` contract).
+
+## License
+
+[MIT](LICENSE)
