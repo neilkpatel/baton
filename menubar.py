@@ -24,6 +24,8 @@ except Exception:
 import collectors
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ICON_PATH = os.path.join(HERE, "icons", "baton-color.png")   # colorful relay-runner mark
+_HAVE_ICON = os.path.exists(ICON_PATH)                        # color icon (template=False → real colors)
 PORT = int(os.environ.get("BATON_PORT", "8787"))
 URL = f"http://127.0.0.1:{PORT}"
 POLL_SEC = 5              # pure-poll interval when the file watcher is unavailable
@@ -45,7 +47,7 @@ SOURCE_ORDER = ["claude", "codex_thread", "codex_automation", "git", "manual"]
 # Preferences — small JSON so the notify choice survives login/restart.
 # --------------------------------------------------------------------------
 def _load_prefs():
-    d = {"notify": False}      # A: banner OFF by default; menu bar is ambient
+    d = {"notify": False, "seen": {}}   # banner OFF by default; seen = acknowledged hand-offs
     try:
         with open(PREFS_PATH) as f:
             d.update(json.load(f))
@@ -115,6 +117,39 @@ def _open_codex_thread(tid):
         pass
 
 
+_FRONT_CACHE = {"tty": "", "ts": 0.0}
+_FRONT_TTL = 2.0          # brief cache: reflects tab-switches fast without an osascript per event
+
+
+def _frontmost_terminal_tty():
+    """tty of the Terminal tab you currently have OPEN (front window's selected tab),
+    or '' when Terminal isn't the frontmost app. We ask Terminal's own `frontmost`
+    property — no Accessibility grant needed, just the Terminal automation we already
+    use to jump. Short-cached so a burst of file-watch events doesn't spawn an
+    osascript each time. Fails open (''), so exclusion never hides more than intended."""
+    now = time.time()
+    if now - _FRONT_CACHE["ts"] < _FRONT_TTL:
+        return _FRONT_CACHE["tty"]
+    script = ('set theTty to ""\n'
+              'tell application "Terminal"\n'
+              '  if frontmost then\n'
+              '    try\n'
+              '      set theTty to (tty of selected tab of front window) as text\n'
+              '    end try\n'
+              '  end if\n'
+              'end tell\n'
+              'theTty')
+    try:
+        out = subprocess.run(["osascript", "-e", script],
+                             capture_output=True, text=True, timeout=3)
+        tty = (out.stdout or "").strip().replace("/dev/", "")
+    except Exception:
+        tty = ""
+    _FRONT_CACHE["tty"] = tty
+    _FRONT_CACHE["ts"] = now
+    return tty
+
+
 def _server_up():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.25)
@@ -150,7 +185,9 @@ def _fsevents_cb(streamRef, clientInfo, num, paths, flags, ids):
 
 class Baton(rumps.App):
     def __init__(self):
-        super().__init__("🎽", quit_button=None)
+        super().__init__("Baton",
+                         icon=ICON_PATH if _HAVE_ICON else None,
+                         template=False, quit_button=None)
         self._waiting_ids = set()   # which sessions were waiting last refresh
         self._primed = False        # skip the first pass so login doesn't fire a burst
         self.prefs = _load_prefs()
@@ -200,15 +237,25 @@ class Baton(rumps.App):
 
     def _action_for(self, track):
         """Clicking a track jumps to where it lives: Claude → its Terminal tab,
-        git → the project folder, everything else → the dashboard."""
+        git → the project folder, everything else → the dashboard. If the track is
+        a waiting hand-off, going to it also *acknowledges* it, so it drops off the
+        count until it produces a new answer."""
         ex = track.get("extras") or {}
         src = track.get("source")
         tty = ex.get("tty") or ""
         if src == "claude" and tty.startswith("ttys"):
-            return lambda sender, tty=tty: _jump_to_terminal(tty)
-        if src == "codex_thread" and ex.get("threadId"):
-            return lambda sender, tid=ex["threadId"]: _open_codex_thread(tid)
-        return self.open_dashboard
+            base = lambda sender, tty=tty: _jump_to_terminal(tty)
+        elif src == "codex_thread" and ex.get("threadId"):
+            base = lambda sender, tid=ex["threadId"]: _open_codex_thread(tid)
+        else:
+            base = self.open_dashboard
+
+        def handler(sender, track=track, base=base):
+            if track.get("status") == "waiting":
+                self._mark_seen(track)
+            base(sender)
+            self.refresh(None)            # count drops the instant you go deal with it
+        return handler
 
     def _section(self, emoji, label, group, seen):
         rows = [self._header(f"{emoji} {label} ({len(group)})", seen)]
@@ -242,7 +289,7 @@ class Baton(rumps.App):
         try:
             state = collectors.collect_all()
         except Exception as e:
-            self.title = "🎽 ⚠"
+            self.title = " ⚠" if _HAVE_ICON else "🎽 ⚠"   # runner icon stays; flag the error
             self.menu.clear()
             self.menu = [rumps.MenuItem(f"error: {e}"[:80]), None,
                          rumps.MenuItem("Quit Baton", callback=rumps.quit_application)]
@@ -250,13 +297,37 @@ class Baton(rumps.App):
 
         tracks = state["tracks"]
         waiting = [t for t in tracks if t["status"] == "waiting"]
+        # Acknowledged hand-offs drop off the count until they produce a NEW answer.
+        # A session is "seen" iff its id maps to its current lastActive signature —
+        # a fresh answer changes lastActive, so a real new hand-off re-surfaces. This
+        # is what makes the number go DOWN when you actually deal with a session
+        # (otherwise an answered-but-unreplied session lingers as "waiting" for 24h).
+        seen_sig = self.prefs.get("seen", {})
+        waiting = [t for t in waiting if seen_sig.get(t["id"]) != t.get("lastActive")]
+        if seen_sig:   # prune signatures for tracks that no longer exist (in-memory; saved on next action)
+            live = {t["id"] for t in tracks}
+            self.prefs["seen"] = {k: v for k, v in seen_sig.items() if k in live}
+        # Don't count the chat you currently have OPEN in Terminal — you're already
+        # looking at it, so it isn't a hand-off that needs surfacing. It reappears the
+        # instant you switch to another app/tab (until you actually reply).
+        front = _frontmost_terminal_tty()
+        if front:
+            waiting = [t for t in waiting if (t.get("extras") or {}).get("tty") != front]
+        self._waiting_now = list(waiting)
         done = [t for t in tracks if t["status"] == "done"]
         working = [t for t in tracks if t["status"] == "working"]
 
         # Menu bar title: just the clean count. The *what* (themes) lives one click
         # away in the dropdown — a status-bar title truncates and looks sloppy.
         n = len(waiting)
-        self.title = f"🎽 {n} waiting"
+        # The runner mark carries the identity; show the count only when >0 so an
+        # idle bar is just the clean glyph (no nagging "0"). Emoji fallback if the
+        # icon asset is ever missing.
+        noun = "baton" if n == 1 else "batons"
+        if _HAVE_ICON:
+            self.title = f" {n} {noun} for you" if n else ""
+        else:
+            self.title = f"🎽 {n} {noun} for you" if n else "🎽"
 
         # Push the hand-off — only if you've opted the banner on (default off).
         cur = {t["id"] for t in waiting}
@@ -272,7 +343,7 @@ class Baton(rumps.App):
 
         stamp = time.strftime("%-I:%M %p", time.localtime(state["generatedAt"] / 1000))
         seen = set()
-        rows = [self._header("↩ Click a session to jump to its Terminal", seen),
+        rows = [self._header("↩ Click a session to jump — and clear it", seen),
                 self._header(f"Baton · updated {stamp}", seen), None]
         rows += self._waiting_section(waiting, seen) + [None]
         rows += self._section("🟢", "Working", working, seen) + [None]
@@ -283,6 +354,11 @@ class Baton(rumps.App):
         rows += [
             rumps.MenuItem("Open full dashboard →", callback=self.open_dashboard),
             rumps.MenuItem("Refresh now", callback=self.refresh),
+        ]
+        if self._waiting_now:
+            rows.append(rumps.MenuItem(f"✓ Mark all {len(self._waiting_now)} as seen",
+                                       callback=self.clear_waiting))
+        rows += [
             None,
             notify_item,
             None,
@@ -292,6 +368,21 @@ class Baton(rumps.App):
         self.menu = rows
 
     # --- actions ---------------------------------------------------------
+    def _mark_seen(self, track):
+        """Acknowledge a hand-off: remember this exact answer so it leaves the
+        count until the session answers again (signature = lastActive)."""
+        self.prefs.setdefault("seen", {})[track["id"]] = track.get("lastActive")
+        _save_prefs(self.prefs)
+
+    def clear_waiting(self, _):
+        """Mark every currently-waiting session as seen → the count goes to 0
+        until something genuinely new hands back to you."""
+        seen_sig = self.prefs.setdefault("seen", {})
+        for t in getattr(self, "_waiting_now", []):
+            seen_sig[t["id"]] = t.get("lastActive")
+        _save_prefs(self.prefs)
+        self.refresh(None)
+
     def open_dashboard(self, _):
         _ensure_server()
         webbrowser.open(URL)

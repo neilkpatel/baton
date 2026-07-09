@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="6 6 88 88">
+  <!-- Baton menu-bar mark · "Drive" — relay runner, deep lean, baton reaching ahead.
+       Single flat black on transparent so it ships as a macOS *template* icon
+       (rumps set_icon(..., template=True) → auto-tinted white/black per menu-bar theme).
+       Baton is part of the silhouette (same fill) so the shape alone reads "runner + baton". -->
+  <g fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M60 33 L44 53" stroke-width="14"/>
+    <path d="M44 53 L62 59 L60 79" stroke-width="11"/>
+    <path d="M44 53 L27 61 L14 66" stroke-width="11"/>
+    <path d="M57 37 L72 41 L79 52" stroke-width="8"/>
+    <path d="M57 37 L45 34 L37 41" stroke-width="8"/>
+    <path d="M73 55 L88 47" stroke-width="6"/>
+  </g>
+  <circle cx="64" cy="24" r="9" fill="#000"/>
+</svg>
