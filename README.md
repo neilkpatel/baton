@@ -109,6 +109,16 @@ Single-file collectors + menu bar app in **stdlib Python** (plus `rumps` for the
 `pyobjc-framework-FSEvents` for the watcher, in an isolated `.venv`). The dashboard is
 dependency-free vanilla HTML/CSS/JS. No build step, no framework.
 
+## Known limitations
+
+- **Click-to-jump raises Terminal.app tabs only.** If you run Claude Code in iTerm, Ghostty, or
+  another terminal, detection and counts still work fine; clicking a Claude session just can't
+  raise your tab yet (it opens the dashboard instead). Codex jumps work regardless, via deep link.
+- **Claude Code has no native read/unread flag** (Codex does, and Baton mirrors it directly).
+  For Claude, "waiting" clears when you view the session's Terminal tab, click it in Baton, or
+  hit "Mark all as seen", and it comes back when the session produces a new answer.
+- **macOS only** by nature: FSEvents watcher, menu bar app, AppleScript jump.
+
 ## Security & privacy
 
 Entirely local, strictly read-only over `~/.claude` and `~/.codex` — Baton never mutates your
