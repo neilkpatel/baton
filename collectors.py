@@ -296,8 +296,13 @@ def _codex_rollouts():
             if not m:
                 continue
             tid = m.group(0)
-            if tid not in out or os.path.getmtime(p) > os.path.getmtime(out[tid]):
-                out[tid] = p
+            try:   # Codex archives rollouts (sessions/ → archived_sessions/); a file
+                   # can vanish between the glob and the stat — skip it, don't error
+                   # the whole collector (a partial pass wipes nothing downstream).
+                if tid not in out or os.path.getmtime(p) > os.path.getmtime(out[tid]):
+                    out[tid] = p
+            except OSError:
+                continue
     _codex_roll_cache.update(ts=time.time(), map=out)
     return out
 

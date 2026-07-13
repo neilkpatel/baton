@@ -325,7 +325,11 @@ class Baton(rumps.App):
         waiting = [t for t in tracks if t["status"] == "waiting"
                    and seen_sig.get(t["id"]) != t.get("lastActive")]
 
-        if seen_sig:   # prune signatures for tracks that no longer exist (keep prefs bounded)
+        # Prune signatures for tracks that no longer exist (keep prefs bounded) —
+        # but NEVER on a pass where a collector errored: its tracks are missing,
+        # not gone, and pruning then would wipe those acks so every one of them
+        # resurrects as "waiting" when the collector recovers a refresh later.
+        if seen_sig and not state.get("errors"):
             live = {t["id"] for t in tracks}
             stale = [k for k in seen_sig if k not in live]
             if stale:
