@@ -9,6 +9,24 @@ import os, sys, json, argparse, http.server, socketserver
 import collectors
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+PREFS_PATH = os.path.expanduser("~/.config/baton/prefs.json")
+
+
+def _apply_seen(state):
+    """Overlay the menu bar's acknowledgements (prefs.json `seen`) so both UIs
+    agree on what's still waiting. Same rule as menubar.py: a hand-off is
+    acknowledged iff its id maps to its current lastActive signature — a NEW
+    answer changes lastActive, so it re-surfaces everywhere at once."""
+    try:
+        with open(PREFS_PATH) as f:
+            seen = json.load(f).get("seen", {})
+    except Exception:
+        return state
+    if seen:
+        for t in state["tracks"]:
+            if t["status"] == "waiting" and seen.get(t["id"]) == t.get("lastActive"):
+                t["acknowledged"] = True
+    return state
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -26,7 +44,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/state":
             try:
-                body = json.dumps(collectors.collect_all()).encode()
+                body = json.dumps(_apply_seen(collectors.collect_all())).encode()
                 self._send(200, body, "application/json", no_store=True)
             except Exception as e:
                 self._send(500, json.dumps({"error": str(e)}).encode(),

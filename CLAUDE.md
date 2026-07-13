@@ -20,6 +20,8 @@ Everything is a `track`: `{id, source, title, project, status, lastActive(ms), d
 `status ∈ working|waiting|done|idle|scheduled`. `id` is stable per source (`claude:{sessionId}`,
 `codex_thread:{id}`, `automation:{name}`, `git:{dirname}`, `manual:{uuid}`) and is the localStorage
 key for seen/dismissed/order. `/api/state` → `{generatedAt, tracks[], counts{}, errors[]}`.
+server.py overlays the menu bar's acks (prefs.json `seen`, sig = lastActive) as `acknowledged:true`
+on waiting tracks; the frontend drops those from "waiting" so both UIs agree on the count.
 The frontend renders purely from `tracks` + a localStorage overlay (`baton-v1`), so the
 sample mock (`SAMPLE_TRACKS` in index.html) and live data drive the identical UI.
 

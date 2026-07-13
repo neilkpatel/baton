@@ -318,6 +318,9 @@ function buildTracks(payload){
   for(const t of payload.tracks){
     // dismissed/snoozed → hide while active
     if(STORE.dismissed[t.id] && STORE.dismissed[t.id]>now) continue;
+    // acknowledged in the menu bar (clicked, "mark all seen", or glanced at its
+    // Terminal tab) → no longer "with you" here either; both UIs agree.
+    if(t.status==="waiting" && t.acknowledged) continue;
     // done + reviewed (seen newer than the thing that made it "done") → drop from done
     if(t.status==="done"){
       const anchor=(t.extras&&t.extras.lastRun)||t.lastActive;
@@ -447,6 +450,12 @@ function renderScheduled(tracks){
 
 function renderManual(){
   const el=document.getElementById("tab-manual");
+  // Don't rebuild this tab while you're typing in it — the 3s poll would wipe
+  // uncommitted add-field text and yank focus/cursor out of a note mid-edit.
+  // (Note text itself is already persisted per keystroke; this preserves focus
+  // and the not-yet-added input. Re-renders resume once focus leaves.)
+  const ae=document.activeElement;
+  if(el.contains(ae) && ((ae.id==="m-input"&&ae.value.trim()) || ae.classList.contains("manual-note"))) return;
   const items=STORE.manualItems;
   const list = items.length ? items.map(m=>{
     return `<div class="card">

@@ -130,14 +130,19 @@ def _frontmost_terminal_tty():
     now = time.time()
     if now - _FRONT_CACHE["ts"] < _FRONT_TTL:
         return _FRONT_CACHE["tty"]
+    # The `is running` guard matters: a bare `tell application "Terminal"` LAUNCHES
+    # Terminal just to answer the question — on a machine whose user lives in
+    # iTerm/Ghostty, Baton would silently relaunch Terminal.app on every refresh.
     script = ('set theTty to ""\n'
-              'tell application "Terminal"\n'
-              '  if frontmost then\n'
-              '    try\n'
-              '      set theTty to (tty of selected tab of front window) as text\n'
-              '    end try\n'
-              '  end if\n'
-              'end tell\n'
+              'if application "Terminal" is running then\n'
+              '  tell application "Terminal"\n'
+              '    if frontmost then\n'
+              '      try\n'
+              '        set theTty to (tty of selected tab of front window) as text\n'
+              '      end try\n'
+              '    end if\n'
+              '  end tell\n'
+              'end if\n'
               'theTty')
     try:
         out = subprocess.run(["osascript", "-e", script],
