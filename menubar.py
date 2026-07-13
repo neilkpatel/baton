@@ -296,23 +296,37 @@ class Baton(rumps.App):
             return
 
         tracks = state["tracks"]
-        waiting = [t for t in tracks if t["status"] == "waiting"]
         # Acknowledged hand-offs drop off the count until they produce a NEW answer.
         # A session is "seen" iff its id maps to its current lastActive signature —
         # a fresh answer changes lastActive, so a real new hand-off re-surfaces. This
         # is what makes the number go DOWN when you actually deal with a session
         # (otherwise an answered-but-unreplied session lingers as "waiting" for 24h).
-        seen_sig = self.prefs.get("seen", {})
-        waiting = [t for t in waiting if seen_sig.get(t["id"]) != t.get("lastActive")]
-        if seen_sig:   # prune signatures for tracks that no longer exist (in-memory; saved on next action)
-            live = {t["id"] for t in tracks}
-            self.prefs["seen"] = {k: v for k, v in seen_sig.items() if k in live}
-        # Don't count the chat you currently have OPEN in Terminal — you're already
-        # looking at it, so it isn't a hand-off that needs surfacing. It reappears the
-        # instant you switch to another app/tab (until you actually reply).
+        seen_sig = self.prefs.setdefault("seen", {})
+
+        # A Claude session you currently have OPEN in Terminal counts as READ — the
+        # same way opening a Codex thread clears its blue dot. Claude Code has no
+        # native read/unread flag, so "you're looking at the tab" is the truest signal
+        # we have. Persist it as seen at its current answer so it STAYS cleared after
+        # you switch tabs, and only re-surfaces when that session answers again.
         front = _frontmost_terminal_tty()
         if front:
-            waiting = [t for t in waiting if (t.get("extras") or {}).get("tty") != front]
+            for t in tracks:
+                if (t.get("status") == "waiting" and t.get("source") == "claude"
+                        and (t.get("extras") or {}).get("tty") == front
+                        and seen_sig.get(t["id"]) != t.get("lastActive")):
+                    seen_sig[t["id"]] = t.get("lastActive")
+                    _save_prefs(self.prefs)
+
+        waiting = [t for t in tracks if t["status"] == "waiting"
+                   and seen_sig.get(t["id"]) != t.get("lastActive")]
+
+        if seen_sig:   # prune signatures for tracks that no longer exist (keep prefs bounded)
+            live = {t["id"] for t in tracks}
+            stale = [k for k in seen_sig if k not in live]
+            if stale:
+                for k in stale:
+                    del seen_sig[k]
+                _save_prefs(self.prefs)
         self._waiting_now = list(waiting)
         done = [t for t in tracks if t["status"] == "done"]
         working = [t for t in tracks if t["status"] == "working"]

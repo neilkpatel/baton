@@ -106,14 +106,22 @@ def _text_from_content(c):
     return ""
 
 
+_ttys_cache = {"ts": 0.0, "map": {}}
+TTYS_TTL = 5.0   # the pid->tty map barely changes; the `ps -A` spawn is ~60% of a refresh
+
+
 def _ttys():
     """pid -> controlling tty, one ps call. Terminal.app reports it as '/dev/<tty>',
-    so a click can map a session back to its exact terminal tab."""
+    so a click can map a session back to its exact terminal tab. Cached ~5s: the
+    `ps -A` subprocess is the single most expensive line in a refresh, and during a
+    busy burst (FSEvents fires several refreshes/sec) it would spawn repeatedly."""
+    if _ttys_cache["map"] and time.time() - _ttys_cache["ts"] < TTYS_TTL:
+        return _ttys_cache["map"]
     out = {}
     try:
         raw = subprocess.check_output(["ps", "-Ao", "pid=,tty="], text=True)
     except Exception:
-        return out
+        return _ttys_cache["map"] or out   # transient ps failure: reuse last good map
     for line in raw.splitlines():
         parts = line.split(None, 1)
         if len(parts) == 2:
@@ -121,19 +129,40 @@ def _ttys():
                 out[int(parts[0])] = parts[1].strip()
             except ValueError:
                 pass
+    _ttys_cache.update(ts=time.time(), map=out)
     return out
+
+
+# sid -> {path, mtime, size, res}: a transcript that hasn't changed since last
+# refresh needs no re-read/re-parse — just a stat. This turns the ~7ms of transcript
+# work (1.5MB read+parse across all sessions) into ~0 on unchanged sessions, so a busy
+# burst only re-parses the one session that actually moved. The cached path also skips
+# the per-session glob across ~14 project dirs on the hot path.
+_ctx_cache = {}
 
 
 def _last_context(session_id):
     """Single tail read of the transcript → what this session is *about*.
     Returns dict: role/block of the last meaningful entry (for waiting-detection),
-    plus `ask` (most recent real user prompt) and `answer` (last assistant prose)."""
+    plus `ask` (most recent real user prompt) and `answer` (last assistant prose).
+    Result is mtime-cached per session (see _ctx_cache)."""
     empty = {"role": None, "block": None, "ask": "", "answer": "", "topic": "", "aiTitle": ""}
-    cands = glob.glob(os.path.join(PROJECTS_DIR, "*", session_id + ".jsonl"))
-    if not cands:
-        return empty
+    ent = _ctx_cache.get(session_id)
+    path = ent["path"] if ent else None
+    if not path or not os.path.exists(path):   # first sighting, or the file moved/rotated
+        cands = glob.glob(os.path.join(PROJECTS_DIR, "*", session_id + ".jsonl"))
+        if not cands:
+            _ctx_cache.pop(session_id, None)
+            return empty
+        path = cands[0]
     try:
-        with open(cands[0], "rb") as f:
+        stt = os.stat(path)
+    except OSError:
+        return empty
+    if ent and ent["path"] == path and ent["mtime"] == stt.st_mtime and ent["size"] == stt.st_size:
+        return ent["res"]   # unchanged since last refresh — reuse, no read/parse
+    try:
+        with open(path, "rb") as f:
             f.seek(0, 2)
             size = f.tell()
             f.seek(max(0, size - 262144))  # last 256KB holds the final turns
@@ -169,8 +198,12 @@ def _last_context(session_id):
                 topic = text
         else:
             answer = text
+    def _cache(res):
+        _ctx_cache[session_id] = {"path": path, "mtime": stt.st_mtime, "size": stt.st_size, "res": res}
+        return res
+
     if not last:
-        return empty
+        return _cache(empty)
     role = last.get("type")
     block = None
     msg = last.get("message")
@@ -181,8 +214,8 @@ def _last_context(session_id):
             block = lb.get("type") if isinstance(lb, dict) else "text"
         elif isinstance(c, str):
             block = "text"
-    return {"role": role, "block": block, "ask": ask or "", "answer": answer or "",
-            "topic": topic or "", "aiTitle": ai_title or ""}
+    return _cache({"role": role, "block": block, "ask": ask or "", "answer": answer or "",
+                   "topic": topic or "", "aiTitle": ai_title or ""})
 
 
 def collect_claude():
