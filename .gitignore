@@ -13,3 +13,4 @@ __pycache__/
 
 # local launch notes / post drafts — not for the public repo
 LAUNCH.md
+launch/

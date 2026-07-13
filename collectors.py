@@ -261,10 +261,10 @@ def collect_claude():
             age = now_ms() - updated if updated else DAY * 999
             if ctx["role"] == "assistant" and ctx["block"] == "text" and age < DAY:
                 status = "waiting"
-                detail = (f"Answered — baton's with you: {_trunc(answer or about, 90)}"
-                          if (answer or about) else "Claude answered and is waiting — the baton's with you")
+                detail = (f"Answered · baton's with you: {_trunc(answer or about, 90)}"
+                          if (answer or about) else "Claude answered and is waiting · the baton's with you")
             else:
-                status, detail = "idle", f"Idle — last active {_ago(updated)}"
+                status, detail = "idle", f"Idle · last active {_ago(updated)}"
 
         out.append({
             "id": "claude:" + sid, "source": "claude", "title": title,
@@ -412,8 +412,8 @@ def collect_codex_threads(within_days=3):
             if path:
                 _, answer = _codex_tail_state(path)   # agent's closing line, for the detail
             status = "waiting"
-            detail = (f"Codex — baton's with you: {_trunc(answer, 90)}"
-                      if answer else "Codex has unread output — the baton's with you")
+            detail = (f"Codex · baton's with you: {_trunc(answer, 90)}"
+                      if answer else "Codex has unread output · the baton's with you")
         elif age < 30 * MIN:
             status = "working"
             detail = "Codex is working · " + _ago(v["ts"])
@@ -606,11 +606,11 @@ def collect_git(force=False):
                 continue  # clean and not recent — nothing in flight here
             status = "idle"; detail = f"clean · last commit {_ago(ct)}"
         elif not ct:
-            status = "done"; detail = f"{changed} uncommitted · new repo — ready to commit"
+            status = "done"; detail = f"{changed} uncommitted · new repo, ready to commit"
         elif age < 2 * HR:
             status = "working"; detail = f"{changed} changed · last commit {_ago(ct)}"
         elif age < 7 * DAY:
-            status = "done"; detail = f"{changed} uncommitted · last commit {_ago(ct)} — ready to review or commit"
+            status = "done"; detail = f"{changed} uncommitted · last commit {_ago(ct)}, ready to review or commit"
         else:
             status = "idle"; detail = f"{changed} uncommitted · last commit {_ago(ct)} (stale)"
         out.append({

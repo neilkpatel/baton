@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Baton — a local command center for everything you have in flight: every AI agent, session, job, and active project, in one view." />
+<meta name="description" content="Baton: a local command center for everything you have in flight. Every AI agent, session, job, and active project, in one view." />
 <title>Baton</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0f14'/%3E%3Cg transform='rotate(-40 16 16)'%3E%3Crect x='9' y='13.5' width='14' height='5' rx='2.5' fill='%232dd4bf'/%3E%3Ccircle cx='9.5' cy='16' r='3' fill='%2338bdf8'/%3E%3Ccircle cx='22.5' cy='16' r='3' fill='%23fbbf24'/%3E%3C/g%3E%3C/svg%3E" />
 <style>
@@ -157,7 +157,7 @@
       </svg>
       <div>
         <h1>Baton</h1>
-        <div class="tag">Everything you have in flight — and where the baton is right now.</div>
+        <div class="tag">Everything you have in flight, and where the baton is right now.</div>
       </div>
     </div>
     <div class="top-right">
@@ -210,16 +210,16 @@ function sampleState(){
     // — Claude Code sessions (the star signal) —
     {id:"claude:55645", source:"claude", title:"baton", project:"~/Projects/baton",
      status:"working", lastActive:ago(0.5), alive:true,
-     detail:"Claude is working — scaffolding the dashboard", extras:{sessionName:"baton build"}},
+     detail:"Working on: scaffolding the dashboard", extras:{sessionName:"baton build"}},
     {id:"claude:24893", source:"claude", title:"webapp", project:"~/Projects/webapp",
      status:"waiting", lastActive:ago(6), alive:true,
-     detail:"Claude answered and is waiting — the baton's with you", extras:{sessionName:"push-notif bug"}},
+     detail:"Claude answered and is waiting · the baton's with you", extras:{sessionName:"push-notif bug"}},
     {id:"claude:8731", source:"claude", title:"docs-site", project:"~/Projects/docs-site",
      status:"waiting", lastActive:ago(23), alive:true,
      detail:"Asked you a question about the nav structure", extras:{sessionName:"docs revamp"}},
     {id:"claude:9577", source:"claude", title:"portfolio", project:"~/Projects/portfolio",
      status:"idle", lastActive:ago(2*1440), alive:true,
-     detail:"Idle ~2 days — last turn was an answer", extras:{sessionName:""}},
+     detail:"Idle ~2 days · last turn was an answer", extras:{sessionName:""}},
 
     // — Codex threads (recency only; no working/waiting signal) —
     {id:"codex_thread:019f0818", source:"codex_thread", title:"Refactor billing webhooks",
@@ -235,7 +235,7 @@ function sampleState(){
      detail:"11 changed · last commit 40m ago", extras:{changedCount:11}},
     {id:"git:analytics", source:"git", title:"analytics",
      project:"~/Projects/analytics", status:"done", lastActive:ago(300),
-     detail:"6 uncommitted · last commit 3 weeks ago — ready to review or commit", extras:{changedCount:6}},
+     detail:"6 uncommitted · last commit 3 weeks ago, ready to review or commit", extras:{changedCount:6}},
 
     // — Codex automations (scheduled pipelines) —
     {id:"automation:retry-failed-jobs", source:"codex_automation", title:"retry-failed-jobs",
@@ -400,7 +400,7 @@ function renderNow(tracks){
       items.sort((a,c)=>(c.lastActive||0)-(a.lastActive||0));
       const extra=items.length-6;
       html+=bucketHTML(b.label,b.emoji,items.slice(0,6));
-      html+=`<div class="section-note" style="margin:-18px 2px 26px">+${extra} more idle — see the By Project tab for everything</div>`;
+      html+=`<div class="section-note" style="margin:-18px 2px 26px">+${extra} more idle · see the By Project tab for everything</div>`;
     }else{
       html+=bucketHTML(b.label,b.emoji,items);
     }
@@ -420,7 +420,7 @@ function renderProject(tracks){
     return mb-ma;
   });
   if(!keys.length){ el.innerHTML=`<div class="empty-state">No project activity detected.</div>`; return; }
-  el.innerHTML=`<div class="section-note">Every signal for a folder, together — agents, threads, and uncommitted work side by side.</div>`+
+  el.innerHTML=`<div class="section-note">Every signal for a folder, together: agents, threads, and uncommitted work side by side.</div>`+
     keys.map(p=>{
       const items=byProj[p].sort((a,b)=>(b.lastActive||0)-(a.lastActive||0));
       const name=p.split("/").pop();

@@ -366,7 +366,7 @@ class Baton(rumps.App):
 
         stamp = time.strftime("%-I:%M %p", time.localtime(state["generatedAt"] / 1000))
         seen = set()
-        rows = [self._header("↩ Click a session to jump — and clear it", seen),
+        rows = [self._header("↩ Click a session to jump and clear it", seen),
                 self._header(f"Baton · updated {stamp}", seen), None]
         rows += self._waiting_section(waiting, seen) + [None]
         rows += self._section("🟢", "Working", working, seen) + [None]

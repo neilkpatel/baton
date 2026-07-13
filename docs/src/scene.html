@@ -75,7 +75,7 @@ if (mode === "banner") {
         <img class="runner" src="${RUNNER}" width="185" height="185">
         <div>
           <div class="wordmark">Baton<span class="accent">.</span></div>
-          <div class="tagline">Know which AI agent needs you — right now.</div>
+          <div class="tagline">Know which AI agent needs you, right now.</div>
           <div class="sub"><b>Claude Code</b> + <b>Codex</b> in your macOS menu bar · click to jump</div>
         </div>
       </div>`);
@@ -93,7 +93,7 @@ if (mode === "social") {
             <div class="wordmark" style="font-size:104px">Baton<span class="accent">.</span></div>
           </div>
           <div class="tagline" style="max-width:600px;margin-top:34px;font-size:34px;line-height:1.3">
-            Know which AI agent<br>needs you — <span style="color:var(--gold)">right now</span>.</div>
+            Know which AI agent<br>needs you, <span style="color:var(--gold)">right now</span>.</div>
           <div class="sub" style="font-size:23px;margin-top:20px"><b>Claude Code</b> + <b>Codex</b> · macOS menu bar</div>
           <div class="pill">curl … /install.sh | bash</div>
         </div>
@@ -138,14 +138,14 @@ if (mode === "frame") {
   if (dd) {
     const icon = document.querySelector(".menubar img");
     const r = icon.getBoundingClientRect();
-    const ddW = 260, ddH = ddW * 1108 / 668;                 // menubar.png is 668x1108
+    const ddW = 260, ddH = ddW * 1016 / 576;                 // menubar.png is 576x1016
     const ddLeft = Math.min(r.left - 10, 800 - ddW - 16);
     const ddTop = 50;
     el(`<img class="dropdown" src="${MENU}" width="${ddW}"
              style="left:${ddLeft}px;top:${ddTop}px;
                     transform:scale(${0.9 + 0.1 * ddT});opacity:${ddT}">`);
     // first waiting item ("Fix push-notification permissions bug"), as fractions of the shot
-    const hlTop = ddTop + ddH * 0.250, hlH = ddH * 0.040;
+    const hlTop = ddTop + ddH * 0.225, hlH = ddH * 0.043;
     if (hlOn) {
       const glow = click ? "background:rgba(56,189,248,.45);" : "";
       el(`<div class="hl" style="left:${ddLeft + ddW * 0.06}px;top:${hlTop}px;
@@ -164,9 +164,9 @@ if (mode === "frame") {
   // caption
   const cap =
     f < 6   ? ["Heads-down in one session…", "Baton watches the rest."] :
-    f < 15  ? [`<span class="accent">Agents hand back</span> while you work`, "The count is live — under a second, via FSEvents."] :
+    f < 15  ? [`<span class="accent">Agents hand back</span> while you work`, "The count is live: under a second, via FSEvents."] :
     f < 33  ? ["One glance, grouped by tool", "Claude Code and Codex, waiting → working → done."] :
-              ["Click to jump — and clear it", "Straight to that Terminal tab or Codex thread."];
+              ["Click to jump, and clear it", "Straight to that Terminal tab or Codex thread."];
   el(`<div class="caption" style="max-width:290px"><h2>${cap[0]}</h2><p>${cap[1]}</p></div>`);
 }
 </script>
